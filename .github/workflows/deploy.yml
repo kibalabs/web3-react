@@ -25,11 +25,7 @@ jobs:
           cache-from: type=gha,scope=package
           cache-to: type=gha,mode=max,scope=package
           tags: ${{ env.DOCKER_IMAGE }}
-      - name: Calculate commit count since last tag
-        id: vars
-        run: echo ::set-output name=commit_count::$(git rev-list $(git describe --tags --abbrev=0)..HEAD --count)
       - name: Create .npmrc file
         run: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
       - name: Publish next package to npm
-        if: steps.vars.outputs.commit_count != '0'
-        run: docker run -v $(pwd)/.npmrc:/root/.npmrc $DOCKER_IMAGE /bin/bash -c "npm run publish-next -- --next-version ${{ steps.vars.outputs.commit_count }}"
+        run: docker run -v $(pwd)/.npmrc:/root/.npmrc $DOCKER_IMAGE make publish-next
