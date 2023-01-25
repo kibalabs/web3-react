@@ -36,10 +36,10 @@ build-static:
 	@ echo "Not Supported"
 
 start:
-    build-react-component --start --dev
+	@ build-react-component --start --dev
 
 start-prod:
-    build-react-component --start
+	@ build-react-component --start
 
 test:
 	@ echo "Not Supported"

@@ -160,7 +160,7 @@ export const useWeb3 = (): ethers.providers.Web3Provider | undefined | null => {
   return accountsControl.web3;
 };
 
-export const useAccount = (): Account | undefined | null => {
+export const useWeb3Account = (): Account | undefined | null => {
   const accountsControl = React.useContext(AccountContext);
   if (!accountsControl) {
     throw Error('accountsControl has not been initialized correctly.');
@@ -168,7 +168,7 @@ export const useAccount = (): Account | undefined | null => {
   return accountsControl.account;
 };
 
-export const useOnLinkAccountsClicked = (): (() => void) => {
+export const useWeb3OnLinkAccountsClicked = (): (() => void) => {
   const accountsControl = React.useContext(AccountContext);
   if (!accountsControl) {
     throw Error('accountsControl has not been initialized correctly.');
@@ -176,7 +176,7 @@ export const useOnLinkAccountsClicked = (): (() => void) => {
   return accountsControl.onLinkAccountsClicked;
 };
 
-export const useOnLoginClicked = (): (() => Promise<LoginSignature | null>) => {
+export const useWeb3OnLoginClicked = (): (() => Promise<LoginSignature | null>) => {
   const accountsControl = React.useContext(AccountContext);
   if (!accountsControl) {
     throw Error('accountsControl has not been initialized correctly.');
@@ -184,7 +184,7 @@ export const useOnLoginClicked = (): (() => Promise<LoginSignature | null>) => {
   return accountsControl.onLoginClicked;
 };
 
-export const useLoginSignature = (): LoginSignature | undefined | null => {
+export const useWeb3LoginSignature = (): LoginSignature | undefined | null => {
   const accountsControl = React.useContext(AccountContext);
   if (!accountsControl) {
     throw Error('accountsControl has not been initialized correctly.');
@@ -192,7 +192,7 @@ export const useLoginSignature = (): LoginSignature | undefined | null => {
   return accountsControl.loginSignature;
 };
 
-export const useChainId = (): number | undefined | null => {
+export const useWeb3ChainId = (): number | undefined | null => {
   const accountsControl = React.useContext(AccountContext);
   if (!accountsControl) {
     throw Error('accountsControl has not been initialized correctly.');
