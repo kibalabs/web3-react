@@ -5,8 +5,6 @@ import { IMultiAnyChildProps, useInitialization } from '@kibalabs/core-react';
 import detectEthereumProvider from '@metamask/detect-provider';
 import { BigNumber, ethers } from 'ethers';
 
-// import { useToastManager } from './components/Toast';
-
 export type Web3Account = {
   address: string;
   signer: ethers.Signer;

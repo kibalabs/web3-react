@@ -46,11 +46,11 @@ test:
 
 publish:
 	@ npm publish
-
+	
 publish-next:
-	@ COMMIT_COUNT=$(git rev-list $(git describe --tags --abbrev=0)..HEAD --count)
-	@ echo "$(COMMIT_COUNT)"
-	@ if [ -n "$(COMMIT_COUNT)" ]; then npx kiba-publish --next --next-version "$(COMMIT_COUNT)"; fi
+ifneq ($(COMMIT_COUNT),0)
+	npx kiba-publish --next --next-version $(COMMIT_COUNT)
+endif
 
 clean:
 	@ rm -rf ./node_modules ./package-lock.json ./build ./dist
