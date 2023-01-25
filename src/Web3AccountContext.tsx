@@ -70,11 +70,11 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
       return;
     }
     // @ts-expect-error
-    onWeb3AccountsChanged(await web3.provider.request({ method: 'eth_web3Accounts' }));
+    onWeb3AccountsChanged(await web3.provider.request({ method: 'eth_accounts' }));
     // @ts-expect-error
-    web3.provider.on('web3AccountsChanged', onWeb3AccountsChanged);
+    web3.provider.on('accountsChanged', onWeb3AccountsChanged);
     // @ts-expect-error
-    const newChainId = await web3.provider.request({ method: 'eth_web3ChainId' });
+    const newChainId = await web3.provider.request({ method: 'eth_chainId' });
     setWeb3ChainId(BigNumber.from(newChainId).toNumber());
     // @ts-expect-error
     web3.provider.on('chainChanged', onChainChanged);
@@ -89,7 +89,7 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
       return;
     }
     // @ts-expect-error
-    web3.provider.request({ method: 'eth_requestWeb3Accounts', params: [] }).then(async (): Promise<void> => {
+    web3.provider.request({ method: 'eth_requestAccounts', params: [] }).then(async (): Promise<void> => {
       await loadWeb3();
     }).catch((error: unknown): void => {
       if ((error as Error).message?.includes('wallet_requestPermissions')) {
