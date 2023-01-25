@@ -1,3 +1,3 @@
-export * from './AccountContext';
-export * from './useContract';
-export * from './useTransaction';
+export * from './Web3AccountContext';
+export * from './useWeb3Contract';
+export * from './useWeb3Transaction';
