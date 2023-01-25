@@ -9,4 +9,4 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build
+RUN make build
