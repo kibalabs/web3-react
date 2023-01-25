@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import React from 'react';
 
-import { useWeb3, useWeb3ChainId } from "./AccountContext";
+import { useWeb3, useWeb3ChainId } from "./Web3AccountContext";
 
 
 export const useWeb3Contract = (contractChainIdAddressMap: Record<number, string>, abi: ethers.ContractInterface): ethers.Contract | null | undefined => {

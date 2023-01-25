@@ -22,9 +22,9 @@
     "ethers": "5.7.2"
   },
   "devDependencies": {
-    "@kibalabs/build": "^0.10.0",
-    "@types/react": "18.0.21",
-    "@types/react-dom": "18.0.6",
+    "@kibalabs/build": "^0.12.0",
+    "@types/react": "18.0.27",
+    "@types/react-dom": "18.0.10",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },

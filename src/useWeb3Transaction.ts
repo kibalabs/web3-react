@@ -4,14 +4,14 @@ import { ethers } from 'ethers';
 
 export type TransactionPromise = Promise<ethers.ContractTransaction>;
 
-export interface TransactionDetails {
+export interface Web3TransactionDetails {
   transactionPromise: TransactionPromise | null;
   transaction: ethers.ContractTransaction | null;
   error: Error | null;
   receipt: ethers.ContractReceipt | null;
 }
 
-export const useTransaction = (): [TransactionDetails, (newTransactionPromise: TransactionPromise | null) => void, () => void, () => void] => {
+export const useWeb3Transaction = (): [Web3TransactionDetails, (newTransactionPromise: TransactionPromise | null) => void, () => void, () => void] => {
   const [transactionPromise, setTransactionPromise] = React.useState<TransactionPromise | null>(null);
   const [transaction, setTransaction] = React.useState<ethers.ContractTransaction | null>(null);
   const [error, setError] = React.useState<Error | null>(null);
