@@ -27,7 +27,7 @@ security-check-ci:
 	@ echo "Not Supported"
 
 build:
-	@ echo "Not Supported"
+	@ build-react-component
 
 build-ssr:
 	@ echo "Not Supported"
@@ -46,7 +46,7 @@ test:
 
 publish:
 	@ npm publish
-	
+
 publish-next:
 ifneq ($(COMMIT_COUNT),0)
 	npx kiba-publish --next --next-version $(COMMIT_COUNT)
