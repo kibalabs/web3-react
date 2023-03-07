@@ -8,23 +8,21 @@
     "url": "https://github.com/kibalabs/web3-react.git"
   },
   "bugs": "https://github.com/kibalabs/web3-react/issues",
-  "files": [
-    "dist/*"
-  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "sideEffects": false,
+  "files": [
+    "./dist/**/*"
+  ],
   "dependencies": {
-    "@ethersproject/abstract-provider": "5.7.0",
     "@kibalabs/core": "^0.5.10",
     "@kibalabs/core-react": "^0.9.3",
-    "@metamask/detect-provider": "2.0.0",
-    "ethers": "5.7.2"
+    "ethers": "6.1.0"
   },
   "devDependencies": {
-    "@kibalabs/build": "^0.12.0",
-    "@types/react": "18.0.27",
-    "@types/react-dom": "18.0.10",
+    "@kibalabs/build": "0.12.1-next.5",
+    "@types/react": "18.0.28",
+    "@types/react-dom": "18.0.11",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
