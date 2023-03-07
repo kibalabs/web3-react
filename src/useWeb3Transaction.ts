@@ -1,21 +1,23 @@
 import React from 'react';
 
-import { ethers } from 'ethers';
+import { TransactionResponse, TransactionReceipt } from 'ethers';
+import { useWeb3 } from './Web3AccountContext';
 
-export type TransactionPromise = Promise<ethers.ContractTransaction>;
+export type TransactionPromise = Promise<TransactionResponse>;
 
 export interface Web3TransactionDetails {
   transactionPromise: TransactionPromise | null;
-  transaction: ethers.ContractTransaction | null;
+  transaction: TransactionResponse | null;
   error: Error | null;
-  receipt: ethers.ContractReceipt | null;
+  receipt: TransactionReceipt | null;
 }
 
 export const useWeb3Transaction = (): [Web3TransactionDetails, (newTransactionPromise: TransactionPromise | null) => void, () => void, () => void] => {
+  const web3 = useWeb3();
   const [transactionPromise, setTransactionPromise] = React.useState<TransactionPromise | null>(null);
-  const [transaction, setTransaction] = React.useState<ethers.ContractTransaction | null>(null);
+  const [transaction, setTransaction] = React.useState<TransactionResponse | null>(null);
   const [error, setError] = React.useState<Error | null>(null);
-  const [receipt, setReceipt] = React.useState<ethers.ContractReceipt | null>(null);
+  const [receipt, setReceipt] = React.useState<TransactionReceipt | null>(null);
 
   const clearError = React.useCallback((): void => {
     setError(null);
