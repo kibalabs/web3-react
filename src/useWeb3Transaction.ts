@@ -1,7 +1,6 @@
 import React from 'react';
 
-import { TransactionResponse, TransactionReceipt } from 'ethers';
-import { useWeb3 } from './Web3AccountContext';
+import { TransactionReceipt, TransactionResponse } from './model';
 
 export type TransactionPromise = Promise<TransactionResponse>;
 
@@ -13,7 +12,6 @@ export interface Web3TransactionDetails {
 }
 
 export const useWeb3Transaction = (): [Web3TransactionDetails, (newTransactionPromise: TransactionPromise | null) => void, () => void, () => void] => {
-  const web3 = useWeb3();
   const [transactionPromise, setTransactionPromise] = React.useState<TransactionPromise | null>(null);
   const [transaction, setTransaction] = React.useState<TransactionResponse | null>(null);
   const [error, setError] = React.useState<Error | null>(null);

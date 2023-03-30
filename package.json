@@ -17,11 +17,11 @@
   "dependencies": {
     "@kibalabs/core": "^0.5.10",
     "@kibalabs/core-react": "^0.9.3",
-    "ethers": "6.1.0"
+    "ethers": "^6.2.3"
   },
   "devDependencies": {
     "@kibalabs/build": "0.12.1-next.5",
-    "@types/react": "18.0.28",
+    "@types/react": "18.0.31",
     "@types/react-dom": "18.0.11",
     "react": "18.2.0",
     "react-dom": "18.2.0"

@@ -2,11 +2,13 @@ import React from 'react';
 
 import { dateToString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useInitialization } from '@kibalabs/core-react';
-import { ethers, Provider as EthersProvider, JsonRpcApiProvider as EthersWritableProvider } from 'ethers';
+import { Eip1193Provider, BrowserProvider as EthersBrowserProvider, Provider as EthersProvider, JsonRpcApiProvider as EthersWritableProvider } from 'ethers';
+
+import { Signer } from './model';
 
 export type Web3Account = {
   address: string;
-  signer: ethers.Signer;
+  signer: Signer;
 }
 
 export type Web3LoginSignature = {
@@ -31,7 +33,8 @@ interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
 }
 
 export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderProps): React.ReactElement => {
-  const [web3, setWeb3] = React.useState<EthersProvider | null | undefined>(undefined);
+  const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
+  const [web3, setWeb3] = React.useState<EthersBrowserProvider | null | undefined>(undefined);
   const [web3ChainId, setWeb3ChainId] = React.useState<number | null | undefined>(undefined);
   const [web3Account, setWeb3Account] = React.useState<Web3Account | undefined | null>(undefined);
   const [loginCount, setLoginCount] = React.useState<number>(0);
@@ -39,12 +42,16 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
   const loadWeb3 = async (): Promise<void> => {
     // NOTE(krishan711): keep an eye on how metamask provider does this: https://github.com/MetaMask/detect-provider/blob/main/src/index.ts
     // NOTE(krishan711): could use ethers.getDefaultProvider() for non-wallet scenarios
-    const provider = window.ethereum != null ? new ethers.BrowserProvider(window.ethereum) : null;
+    // @ts-expect-error
+    const provider = window.ethereum != null ? new EthersBrowserProvider(window.ethereum) : null;
     if (!provider) {
       setWeb3Account(null);
+      setEip1193Provider(null);
       return;
     }
     setWeb3(provider);
+    // @ts-expect-error
+    setEip1193Provider(window.ethereum);
   };
 
   const onChainChanged = React.useCallback((): void => {
@@ -55,13 +62,13 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
-    const potentialLinkedWeb3Accounts: (ethers.Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<ethers.Signer | null> => {
+    const potentialLinkedWeb3Accounts: (Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<Signer | null> => {
       if (!(web3 instanceof EthersWritableProvider)) {
         return Promise.resolve(null);
       }
       return (web3 as EthersWritableProvider).getSigner(web3AccountAddress);
     }));
-    const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: ethers.Signer | null): boolean => potentialSigner != null) as ethers.Signer[];
+    const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Signer | null): boolean => potentialSigner != null) as Signer[];
     if (linkedWeb3Accounts.length === 0) {
       setWeb3Account(null);
       return;
@@ -76,25 +83,36 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
-    // @ts-expect-error
-    onWeb3AccountsChanged(await web3.provider.request({ method: 'eth_accounts' }));
-    web3.provider.on('accountsChanged', onWeb3AccountsChanged);
-    // @ts-expect-error
-    const newChainId = await web3.provider.request({ method: 'eth_chainId' });
+    const newWeb3AccountAddresses = await web3.send('eth_accounts', []);
+    onWeb3AccountsChanged(newWeb3AccountAddresses);
+    const newChainId = await web3.send('eth_chainId', []);
     setWeb3ChainId(Number(newChainId));
-    web3.provider.on('chainChanged', onChainChanged);
-  }, [web3, onWeb3AccountsChanged, onChainChanged]);
+  }, [web3, onWeb3AccountsChanged]);
 
   React.useEffect((): void => {
     loadWeb3Accounts();
   }, [loadWeb3Accounts]);
+
+  const monitorWeb3AccountChanges = React.useCallback(async (): Promise<void> => {
+    if (!eip1193Provider) {
+      return;
+    }
+    // @ts-expect-error
+    eip1193Provider.on('accountsChanged', onWeb3AccountsChanged);
+    // @ts-expect-error
+    eip1193Provider.on('chainChanged', onChainChanged);
+  }, [eip1193Provider, onWeb3AccountsChanged, onChainChanged]);
+
+  React.useEffect((): void => {
+    monitorWeb3AccountChanges();
+  }, [monitorWeb3AccountChanges]);
 
   const onLinkWeb3AccountsClicked = async (): Promise<void> => {
     if (!web3) {
       return;
     }
     // @ts-expect-error
-    web3.provider.request({ method: 'eth_requestAccounts', params: [] }).then(async (): Promise<void> => {
+    web3.send('eth_requestAccounts').then(async (): Promise<void> => {
       await loadWeb3();
     }).catch((error: unknown): void => {
       if ((error as Error).message?.includes('wallet_requestPermissions')) {
