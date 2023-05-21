@@ -1,21 +1,21 @@
 import React from 'react';
 
-import { TransactionReceipt, TransactionResponse } from './model';
+import { Web3TransactionReceipt, Web3TransactionResponse } from './model';
 
-export type TransactionPromise = Promise<TransactionResponse>;
+export type TransactionPromise = Promise<Web3TransactionResponse>;
 
 export interface Web3TransactionDetails {
   transactionPromise: TransactionPromise | null;
-  transaction: TransactionResponse | null;
+  transaction: Web3TransactionResponse | null;
   error: Error | null;
-  receipt: TransactionReceipt | null;
+  receipt: Web3TransactionReceipt | null;
 }
 
 export const useWeb3Transaction = (): [Web3TransactionDetails, (newTransactionPromise: TransactionPromise | null) => void, () => void, () => void] => {
   const [transactionPromise, setTransactionPromise] = React.useState<TransactionPromise | null>(null);
-  const [transaction, setTransaction] = React.useState<TransactionResponse | null>(null);
+  const [transaction, setTransaction] = React.useState<Web3TransactionResponse | null>(null);
   const [error, setError] = React.useState<Error | null>(null);
-  const [receipt, setReceipt] = React.useState<TransactionReceipt | null>(null);
+  const [receipt, setReceipt] = React.useState<Web3TransactionReceipt | null>(null);
 
   const clearError = React.useCallback((): void => {
     setError(null);
@@ -69,14 +69,15 @@ export const useWeb3Transaction = (): [Web3TransactionDetails, (newTransactionPr
     waitForTransaction();
   }, [waitForTransaction]);
 
-  return [{
-    transactionPromise,
-    transaction,
-    error,
-    receipt,
-  },
-  setNewTransactionPromise,
-  clearError,
-  clearTransaction,
+  return [
+    {
+      transactionPromise,
+      transaction,
+      error,
+      receipt,
+    },
+    setNewTransactionPromise,
+    clearError,
+    clearTransaction,
   ];
 };

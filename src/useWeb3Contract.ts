@@ -2,14 +2,14 @@ import React from 'react';
 
 import { Contract as EthersContract } from 'ethers';
 
-import { Contract, ContractInterface } from './model';
+import { Web3Contract, Web3ContractInterface } from './model';
 import { useWeb3, useWeb3ChainId } from './Web3AccountContext';
 
 
-export const useWeb3Contract = (contractChainIdAddressMap: Record<number, string>, abi: ContractInterface): Contract | null | undefined => {
+export const useWeb3Contract = (contractChainIdAddressMap: Record<number, string>, abi: Web3ContractInterface): Web3Contract | null | undefined => {
   const web3 = useWeb3();
   const chainId = useWeb3ChainId();
-  const contract = React.useMemo((): Contract | null | undefined => {
+  const contract = React.useMemo((): Web3Contract | null | undefined => {
     if (web3 === undefined || chainId === undefined) {
       return undefined;
     }

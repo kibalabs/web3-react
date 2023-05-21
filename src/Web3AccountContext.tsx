@@ -4,11 +4,11 @@ import { dateToString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useInitialization } from '@kibalabs/core-react';
 import { Eip1193Provider, BrowserProvider as EthersBrowserProvider, Provider as EthersProvider, JsonRpcApiProvider as EthersWritableProvider } from 'ethers';
 
-import { Signer } from './model';
+import { Web3Signer } from './model';
 
 export type Web3Account = {
   address: string;
-  signer: Signer;
+  signer: Web3Signer;
 }
 
 export type Web3LoginSignature = {
@@ -62,13 +62,13 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
-    const potentialLinkedWeb3Accounts: (Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<Signer | null> => {
+    const potentialLinkedWeb3Accounts: (Web3Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<Web3Signer | null> => {
       if (!(web3 instanceof EthersWritableProvider)) {
         return Promise.resolve(null);
       }
       return (web3 as EthersWritableProvider).getSigner(web3AccountAddress);
     }));
-    const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Signer | null): boolean => potentialSigner != null) as Signer[];
+    const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
     if (linkedWeb3Accounts.length === 0) {
       setWeb3Account(null);
       return;
