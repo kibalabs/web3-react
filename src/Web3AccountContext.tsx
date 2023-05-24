@@ -2,9 +2,9 @@ import React from 'react';
 
 import { dateToString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useInitialization } from '@kibalabs/core-react';
-import { Eip1193Provider, BrowserProvider as EthersBrowserProvider, Provider as EthersProvider, JsonRpcApiProvider as EthersWritableProvider } from 'ethers';
+import { Eip1193Provider, BrowserProvider as EthersBrowserProvider, JsonRpcApiProvider as EthersJsonRpcApiProvider } from 'ethers';
 
-import { Web3Signer } from './model';
+import { Web3Provider, Web3Signer } from './model';
 
 export type Web3Account = {
   address: string;
@@ -17,7 +17,7 @@ export type Web3LoginSignature = {
 }
 
 type Web3AccountControl = {
-  web3: EthersProvider | undefined | null;
+  web3: Web3Provider | undefined | null;
   web3ChainId: number | undefined | null;
   web3Account: Web3Account | undefined | null;
   web3LoginSignature: Web3LoginSignature | undefined | null;
@@ -63,10 +63,10 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
       return;
     }
     const potentialLinkedWeb3Accounts: (Web3Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<Web3Signer | null> => {
-      if (!(web3 instanceof EthersWritableProvider)) {
+      if (!(web3 instanceof EthersJsonRpcApiProvider)) {
         return Promise.resolve(null);
       }
-      return (web3 as EthersWritableProvider).getSigner(web3AccountAddress);
+      return (web3 as EthersJsonRpcApiProvider).getSigner(web3AccountAddress);
     }));
     const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
     if (linkedWeb3Accounts.length === 0) {
@@ -171,7 +171,7 @@ Date: ${dateToString(new Date())}
   );
 };
 
-export const useWeb3 = (): EthersProvider | undefined | null => {
+export const useWeb3 = (): Web3Provider | undefined | null => {
   const web3AccountsControl = React.useContext(Web3AccountContext);
   if (!web3AccountsControl) {
     throw Error('web3AccountsControl has not been initialized correctly.');
