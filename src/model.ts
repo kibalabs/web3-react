@@ -1,4 +1,4 @@
-import { Contract as EthersContract, Provider as EthersProvider, InterfaceAbi as EthersInterfaceAbi, Signer as EthersSigner, TransactionReceipt as EthersTransactionReceipt, TransactionResponse as EthersTransactionResponse } from 'ethers';
+import { Contract as EthersContract, InterfaceAbi as EthersInterfaceAbi, Provider as EthersProvider, Signer as EthersSigner, TransactionReceipt as EthersTransactionReceipt, TransactionResponse as EthersTransactionResponse } from 'ethers';
 
 export type Web3Signer = EthersSigner;
 export type Web3Provider = EthersProvider;

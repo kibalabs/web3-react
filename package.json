@@ -14,6 +14,7 @@
   "files": [
     "./dist/**/*"
   ],
+  "//": "NOTE(krishan711): because of some webpack issue, ethers needs to be specified as a dependency by all lib users",
   "dependencies": {
     "@kibalabs/core": "^0.6.1",
     "@kibalabs/core-react": "^0.9.4",
