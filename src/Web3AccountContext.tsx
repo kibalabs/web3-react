@@ -2,12 +2,13 @@ import React from 'react';
 
 import { dateToString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useInitialization } from '@kibalabs/core-react';
-import detectEthereumProvider from '@metamask/detect-provider';
-import { BigNumber, ethers } from 'ethers';
+import { Eip1193Provider, BrowserProvider as EthersBrowserProvider, JsonRpcApiProvider as EthersJsonRpcApiProvider } from 'ethers';
+
+import { Web3Provider, Web3Signer } from './model';
 
 export type Web3Account = {
   address: string;
-  signer: ethers.Signer;
+  signer: Web3Signer;
 }
 
 export type Web3LoginSignature = {
@@ -16,7 +17,7 @@ export type Web3LoginSignature = {
 }
 
 type Web3AccountControl = {
-  web3: ethers.providers.Web3Provider | undefined | null;
+  web3: Web3Provider | undefined | null;
   web3ChainId: number | undefined | null;
   web3Account: Web3Account | undefined | null;
   web3LoginSignature: Web3LoginSignature | undefined | null;
@@ -32,19 +33,25 @@ interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
 }
 
 export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderProps): React.ReactElement => {
-  const [web3, setWeb3] = React.useState<ethers.providers.Web3Provider | null | undefined>(undefined);
+  const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
+  const [web3, setWeb3] = React.useState<EthersBrowserProvider | null | undefined>(undefined);
   const [web3ChainId, setWeb3ChainId] = React.useState<number | null | undefined>(undefined);
   const [web3Account, setWeb3Account] = React.useState<Web3Account | undefined | null>(undefined);
   const [loginCount, setLoginCount] = React.useState<number>(0);
 
   const loadWeb3 = async (): Promise<void> => {
-    const provider = await detectEthereumProvider() as ethers.providers.ExternalProvider;
+    // NOTE(krishan711): keep an eye on how metamask provider does this: https://github.com/MetaMask/detect-provider/blob/main/src/index.ts
+    // NOTE(krishan711): could use ethers.getDefaultProvider() for non-wallet scenarios
+    // @ts-expect-error
+    const provider = window.ethereum != null ? new EthersBrowserProvider(window.ethereum) : null;
     if (!provider) {
       setWeb3Account(null);
+      setEip1193Provider(null);
       return;
     }
-    const web3Connection = new ethers.providers.Web3Provider(provider);
-    setWeb3(web3Connection);
+    setWeb3(provider);
+    // @ts-expect-error
+    setEip1193Provider(window.ethereum);
   };
 
   const onChainChanged = React.useCallback((): void => {
@@ -55,8 +62,15 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
-    const linkedWeb3Accounts = web3AccountAddresses.map((web3AccountAddress: string): ethers.Signer => web3.getSigner(web3AccountAddress));
+    const potentialLinkedWeb3Accounts: (Web3Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<Web3Signer | null> => {
+      if (!(web3 instanceof EthersJsonRpcApiProvider)) {
+        return Promise.resolve(null);
+      }
+      return (web3 as EthersJsonRpcApiProvider).getSigner(web3AccountAddress);
+    }));
+    const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
     if (linkedWeb3Accounts.length === 0) {
+      setWeb3Account(null);
       return;
     }
     // NOTE(krishan711): metamask only deals with one web3Account at the moment but returns an array for future compatibility
@@ -69,35 +83,42 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
-    // @ts-expect-error
-    onWeb3AccountsChanged(await web3.provider.request({ method: 'eth_accounts' }));
-    // @ts-expect-error
-    web3.provider.on('accountsChanged', onWeb3AccountsChanged);
-    // @ts-expect-error
-    const newChainId = await web3.provider.request({ method: 'eth_chainId' });
-    setWeb3ChainId(BigNumber.from(newChainId).toNumber());
-    // @ts-expect-error
-    web3.provider.on('chainChanged', onChainChanged);
-  }, [web3, onWeb3AccountsChanged, onChainChanged]);
+    const newWeb3AccountAddresses = await web3.send('eth_accounts', []);
+    onWeb3AccountsChanged(newWeb3AccountAddresses);
+    const newChainId = await web3.send('eth_chainId', []);
+    setWeb3ChainId(Number(newChainId));
+  }, [web3, onWeb3AccountsChanged]);
 
   React.useEffect((): void => {
     loadWeb3Accounts();
   }, [loadWeb3Accounts]);
+
+  const monitorWeb3AccountChanges = React.useCallback(async (): Promise<void> => {
+    if (!eip1193Provider) {
+      return;
+    }
+    // @ts-expect-error
+    eip1193Provider.on('accountsChanged', onWeb3AccountsChanged);
+    // @ts-expect-error
+    eip1193Provider.on('chainChanged', onChainChanged);
+  }, [eip1193Provider, onWeb3AccountsChanged, onChainChanged]);
+
+  React.useEffect((): void => {
+    monitorWeb3AccountChanges();
+  }, [monitorWeb3AccountChanges]);
 
   const onLinkWeb3AccountsClicked = async (): Promise<void> => {
     if (!web3) {
       return;
     }
     // @ts-expect-error
-    web3.provider.request({ method: 'eth_requestAccounts', params: [] }).then(async (): Promise<void> => {
+    web3.send('eth_requestAccounts').then(async (): Promise<void> => {
       await loadWeb3();
     }).catch((error: unknown): void => {
       if ((error as Error).message?.includes('wallet_requestPermissions')) {
         props.onError(new Error('WALLET_REQUEST_ALREADY_OPEN'));
-        // toastManager.showToast('error', 'You already have a MetaMask request window open, please find it!');
       } else {
         props.onError(new Error('WALLET_CONNECTION_FAILED'));
-        // toastManager.showToast('error', 'Something went wrong connecting to MetaMask. Please try refresh the page / your browser and try again');
       }
     });
   };
@@ -150,7 +171,7 @@ Date: ${dateToString(new Date())}
   );
 };
 
-export const useWeb3 = (): ethers.providers.Web3Provider | undefined | null => {
+export const useWeb3 = (): Web3Provider | undefined | null => {
   const web3AccountsControl = React.useContext(Web3AccountContext);
   if (!web3AccountsControl) {
     throw Error('web3AccountsControl has not been initialized correctly.');
