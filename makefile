@@ -1,6 +1,9 @@
 install:
 	@ npm ci
 
+install-updates:
+	@ npm install
+
 list-outdated: install
 	@ npm outdated
 
@@ -27,7 +30,7 @@ security-check-ci:
 	@ echo "Not Supported"
 
 build:
-	@ npx build-react-component
+	@ npx build-module-rolldown
 
 build-ssr:
 	@ echo "Not Supported"
@@ -35,11 +38,17 @@ build-ssr:
 build-static:
 	@ echo "Not Supported"
 
+build-docs:
+	@ npx storybook build --docs --output-dir dist
+
 start:
-	@ npx build-react-component --start --dev
+	@ npx build-module-rolldown --start --dev
 
 start-prod:
-	@ npx build-react-component --start
+	@ npx build-module-rolldown --start
+
+start-docs:
+	@ npx storybook dev --docs --port 6006
 
 test:
 	@ echo "Not Supported"
@@ -48,8 +57,12 @@ publish:
 	@ npm publish
 
 publish-next:
-ifneq ($(COMMIT_COUNT),0)
-	npx kiba-publish --next --next-version $(COMMIT_COUNT)
+ifneq ($(NEXT_VERSION),0)
+ifneq ($(NEXT_TYPE),)
+	npx kiba-publish --next --next-version $(NEXT_VERSION) --next-type $(NEXT_TYPE)
+else
+	npx kiba-publish --next --next-version $(NEXT_VERSION)
+endif
 endif
 
 clean:
