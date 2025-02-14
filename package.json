@@ -10,18 +10,18 @@
   "bugs": "https://github.com/kibalabs/web3-react/issues",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "type": "module",
   "sideEffects": false,
   "files": [
     "dist/*"
   ],
-  "//": "NOTE(krishan711): because of some webpack issue, ethers needs to be specified as a dependency by all lib users",
   "dependencies": {
-    "@kibalabs/core": "^0.6.1",
-    "@kibalabs/core-react": "^0.9.5",
-    "ethers": "^6.12.1"
+    "@kibalabs/core": "^0.6.3-next.4",
+    "@kibalabs/core-react": "^0.9.7-next.1",
+    "ethers": "^6.13.5"
   },
   "devDependencies": {
-    "@kibalabs/build": "0.13.1",
+    "@kibalabs/build": "0.13.3-next.5",
     "@types/react": "18.3.1",
     "@types/react-dom": "18.3.0",
     "react": "18.3.1",

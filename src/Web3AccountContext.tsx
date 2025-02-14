@@ -32,12 +32,13 @@ interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
   onError: (error: Error) => void;
 }
 
-export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderProps): React.ReactElement => {
+export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
   const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
   const [web3, setWeb3] = React.useState<EthersBrowserProvider | null | undefined>(undefined);
   const [web3ChainId, setWeb3ChainId] = React.useState<number | null | undefined>(undefined);
   const [web3Account, setWeb3Account] = React.useState<Web3Account | undefined | null>(undefined);
   const [loginCount, setLoginCount] = React.useState<number>(0);
+  const onError = props.onError;
 
   const loadWeb3 = async (): Promise<void> => {
     // NOTE(krishan711): keep an eye on how metamask provider does this: https://github.com/MetaMask/detect-provider/blob/main/src/index.ts
@@ -107,7 +108,7 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
     monitorWeb3AccountChanges();
   }, [monitorWeb3AccountChanges]);
 
-  const onLinkWeb3AccountsClicked = async (): Promise<void> => {
+  const onLinkWeb3AccountsClicked = React.useCallback(async (): Promise<void> => {
     if (!web3) {
       return;
     }
@@ -116,12 +117,12 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
       await loadWeb3();
     }).catch((error: unknown): void => {
       if ((error as Error).message?.includes('wallet_requestPermissions')) {
-        props.onError(new Error('WALLET_REQUEST_ALREADY_OPEN'));
+        onError(new Error('WALLET_REQUEST_ALREADY_OPEN'));
       } else {
-        props.onError(new Error('WALLET_CONNECTION_FAILED'));
+        onError(new Error('WALLET_CONNECTION_FAILED'));
       }
     });
-  };
+  }, [web3, onError]);
 
   const web3LoginSignature = React.useMemo((): Web3LoginSignature | null => {
     if (!web3Account || loginCount < 0) {
@@ -136,7 +137,7 @@ export const Web3AccountControlProvider = (props: IWeb3AccountControlProviderPro
     return signature as Web3LoginSignature;
   }, [web3Account, loginCount, props.localStorageClient]);
 
-  const onWeb3LoginClicked = async (): Promise<Web3LoginSignature | null> => {
+  const onWeb3LoginClicked = React.useCallback(async (): Promise<Web3LoginSignature | null> => {
     if (!web3Account) {
       return null;
     }
@@ -158,18 +159,20 @@ Date: ${dateToString(new Date())}
       console.error(error);
     }
     return null;
-  };
+  }, [web3Account, props.localStorageClient, loginCount]);
 
   useInitialization((): void => {
     loadWeb3();
   });
 
+  const providerValue = React.useMemo(() => ({ web3Account, web3LoginSignature, onLinkWeb3AccountsClicked, onWeb3LoginClicked, web3, web3ChainId }), [web3Account, web3LoginSignature, onLinkWeb3AccountsClicked, onWeb3LoginClicked, web3, web3ChainId]);
+
   return (
-    <Web3AccountContext.Provider value={{ web3Account, web3LoginSignature: web3LoginSignature as Web3LoginSignature, onLinkWeb3AccountsClicked, onWeb3LoginClicked, web3, web3ChainId }}>
+    <Web3AccountContext.Provider value={providerValue}>
       {props.children}
     </Web3AccountContext.Provider>
   );
-};
+}
 
 export const useWeb3 = (): Web3Provider | undefined | null => {
   const web3AccountsControl = React.useContext(Web3AccountContext);
