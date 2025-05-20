@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MAJOR] Updated to ethers v6
 - [MINOR] Added model to abstract away ethers types
 - [MAJOR] Updated package to es-module
+- [MAJOR] Updated onChainChanged to not refresh page if account is not initialized (to fix Phantom constant refresh)
 
 ### Removed
 
