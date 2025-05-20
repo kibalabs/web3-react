@@ -55,9 +55,13 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     setEip1193Provider(window.ethereum);
   };
 
-  const onChainChanged = React.useCallback((): void => {
+  const onChainChanged = React.useCallback(async (): Promise<void> => {
+    // NOTE(krishan711): phantom wallet seems to hit these callbacks straight away, so dont reload here unless we have already initialised
+    if (!web3 || !web3ChainId) {
+      return;
+    }
     window.location.reload();
-  }, []);
+  }, [web3, web3ChainId]);
 
   const onWeb3AccountsChanged = React.useCallback(async (web3AccountAddresses: string[]): Promise<void> => {
     if (!web3) {
