@@ -6,6 +6,13 @@ import { Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ether
 
 import { Eip6963AnnounceProviderEvent, Eip6963ProviderDetail, Web3Provider, Web3Signer } from './model';
 
+// Extend the Window interface to include the ethereum property
+declare global {
+  interface Window {
+    ethereum?: Eip1193Provider;
+  }
+}
+
 export type Web3Account = {
   address: string;
   signer: Web3Signer;
@@ -25,6 +32,7 @@ type Web3AccountControl = {
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => void;
   onWeb3LoginClicked: () => Promise<Web3LoginSignature | null>;
+  onSwitchToChainIdClicked: (chainId: number) => Promise<void>;
 }
 
 export const Web3AccountContext = React.createContext<Web3AccountControl | undefined | null>(undefined);
@@ -59,7 +67,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     }
   }, [eip1193Provider, providers, props.localStorageClient]);
 
-  const web3 = React.useMemo((): Web3Provider | undefined | null => {
+  const web3 = React.useMemo((): EthersBrowserProvider | undefined | null => {
     if (eip1193Provider == null) {
       return null;
     }
@@ -83,9 +91,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const loadWeb3 = async (): Promise<void> => {
     window.dispatchEvent(new Event('eip6963:requestProvider'));
     // NOTE(krishan711): need to keep window.ethereum as a fallback option
-    // @ts-expect-error
-    const provider = window.ethereum != null ? new EthersBrowserProvider(window.ethereum) : null;
-    if (provider) {
+    if (window.ethereum != null) {
       const newProvider: Eip6963ProviderDetail = {
         info: {
           uuid: 'ethers',
@@ -93,7 +99,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           icon: "data:image/svg+xml,%3Csvg width='500' height='500' viewBox='0 0 500 500' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_13_2)'%3E%3Crect width='500' height='500' rx='250' fill='white'/%3E%3Cpath d='M356.875 175.188H143.125C125.417 175.188 111.062 189.542 111.062 207.25V335.5C111.062 353.208 125.417 367.562 143.125 367.562H356.875C374.583 367.562 388.938 353.208 388.938 335.5V207.25C388.938 189.542 374.583 175.188 356.875 175.188Z' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M353.776 175.187V155.148C353.774 150.234 352.688 145.38 350.594 140.933C348.501 136.486 345.452 132.556 341.664 129.424C337.877 126.291 333.445 124.033 328.685 122.81C323.925 121.588 318.953 121.431 314.125 122.351L138.209 152.376C130.569 153.832 123.677 157.908 118.722 163.902C113.766 169.895 111.057 177.43 111.063 185.207V217.937' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M324.813 292.75C320.585 292.75 316.452 291.496 312.937 289.148C309.422 286.799 306.682 283.461 305.065 279.555C303.447 275.649 303.023 271.351 303.848 267.205C304.673 263.059 306.709 259.25 309.698 256.261C312.687 253.271 316.496 251.235 320.642 250.411C324.789 249.586 329.087 250.009 332.992 251.627C336.898 253.245 340.236 255.985 342.585 259.5C344.934 263.015 346.188 267.147 346.188 271.375C346.188 277.044 343.936 282.481 339.927 286.489C335.918 290.498 330.482 292.75 324.813 292.75Z' fill='black'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_13_2'%3E%3Crect width='500' height='500' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A",
           rdns: 'ethers',
         },
-        // @ts-expect-error
         provider: window.ethereum,
       };
       setProviders((prevProviders: Eip6963ProviderDetail[] | undefined): Eip6963ProviderDetail[] => {
@@ -154,7 +159,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       // if (!(web3 instanceof EthersJsonRpcApiProvider)) {
       //   return Promise.resolve(null);
       // }
-      // @ts-expect-error
       return web3.getSigner(web3AccountAddress);
     }));
     const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
@@ -172,10 +176,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
-    // @ts-expect-error
     const newWeb3AccountAddresses = await web3.send('eth_accounts', []);
     onWeb3AccountsChanged(newWeb3AccountAddresses);
-    // @ts-expect-error
     const newChainId = await web3.send('eth_chainId', []);
     setWeb3ChainId(Number(newChainId));
   }, [web3, onWeb3AccountsChanged]);
@@ -203,8 +205,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       setIsWaitingToLinkAccount(true);
       return;
     }
-    // @ts-expect-error
-    web3.send('eth_requestAccounts').then(async (): Promise<void> => {
+    web3.send('eth_requestAccounts', []).then(async (): Promise<void> => {
       await loadWeb3Accounts();
     }).catch((error: unknown): void => {
       if ((error as Error).message?.includes('wallet_requestPermissions')) {
@@ -221,6 +222,35 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       onLinkWeb3AccountsClicked();
     }
   }, [isWaitingToLinkAccount, web3, onLinkWeb3AccountsClicked]);
+
+
+  const onSwitchToChainIdClicked = React.useCallback(async (chainId: number): Promise<void> => {
+    if (!web3) {
+      throw new Error('No web3 provider available to switch chain');
+    }
+    try {
+      await web3.send('wallet_switchEthereumChain', [{
+        chainId: `0x${chainId.toString(16)}`,
+      }]);
+    } catch (error: unknown) {
+      // Error code 4902 means the chain hasn't been added to the wallet yet
+      if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: number }).code === 4902) {
+        await web3.send('wallet_addEthereumChain', [{
+          chainId: `0x${chainId.toString(16)}`,
+          chainName: 'Base',
+          nativeCurrency: {
+            name: 'Ethereum',
+            symbol: 'ETH',
+            decimals: 18,
+          },
+          rpcUrls: ['https://mainnet.base.org'],
+          blockExplorerUrls: ['https://basescan.org'],
+        }]);
+      } else {
+        throw error;
+      }
+    }
+  }, [web3]);
 
   const web3LoginSignature = React.useMemo((): Web3LoginSignature | null => {
     if (!web3Account || loginCount < 0) {
@@ -259,7 +289,7 @@ Date: ${dateToString(new Date())}
     return null;
   }, [web3Account, props.localStorageClient, loginCount]);
 
-  const providerValue = React.useMemo((): Web3AccountControl => ({ web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, chooseEip1193Provider, web3, web3ChainId }), [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, web3, web3ChainId]);
+  const providerValue = React.useMemo((): Web3AccountControl => ({ web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId }), [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
@@ -322,4 +352,12 @@ export const useWeb3Providers = (): [Eip6963ProviderDetail[], ((eip1193ProviderR
     throw Error('web3AccountsControl has not been initialized correctly.');
   }
   return [web3AccountsControl.providers, web3AccountsControl.chooseEip1193Provider];
+};
+
+export const useOnSwitchToWeb3ChainIdClicked = (): ((chainId: number) => Promise<void>) => {
+  const web3AccountsControl = React.useContext(Web3AccountContext);
+  if (!web3AccountsControl) {
+    throw Error('web3AccountsControl has not been initialized correctly.');
+  }
+  return web3AccountsControl.onSwitchToChainIdClicked;
 };
