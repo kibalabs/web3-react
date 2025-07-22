@@ -235,16 +235,35 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     } catch (error: unknown) {
       // Error code 4902 means the chain hasn't been added to the wallet yet
       if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: number }).code === 4902) {
+        const chainConfigurations: Record<number, { chainName: string; nativeCurrency: { name: string; symbol: string; decimals: number }; rpcUrls: string[]; blockExplorerUrls: string[] }> = {
+          1: { // Ethereum Mainnet
+            chainName: 'Ethereum Mainnet',
+            nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID'],
+            blockExplorerUrls: ['https://etherscan.io'],
+          },
+          137: { // Polygon Mainnet
+            chainName: 'Polygon Mainnet',
+            nativeCurrency: { name: 'Matic', symbol: 'MATIC', decimals: 18 },
+            rpcUrls: ['https://polygon-rpc.com'],
+            blockExplorerUrls: ['https://polygonscan.com'],
+          },
+          8453: { // Base Mainnet
+            chainName: 'Base',
+            nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://mainnet.base.org'],
+            blockExplorerUrls: ['https://basescan.org'],
+          },
+        };
+
+        const chainConfig = chainConfigurations[chainId];
+        if (!chainConfig) {
+          throw new Error(`Unsupported chainId: ${chainId}`);
+        }
+
         await web3.send('wallet_addEthereumChain', [{
           chainId: `0x${chainId.toString(16)}`,
-          chainName: 'Base',
-          nativeCurrency: {
-            name: 'Ethereum',
-            symbol: 'ETH',
-            decimals: 18,
-          },
-          rpcUrls: ['https://mainnet.base.org'],
-          blockExplorerUrls: ['https://basescan.org'],
+          ...chainConfig,
         }]);
       } else {
         throw error;
