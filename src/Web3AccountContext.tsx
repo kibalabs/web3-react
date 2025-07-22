@@ -236,12 +236,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       // Error code 4902 means the chain hasn't been added to the wallet yet
       if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: number }).code === 4902) {
         const chainConfigurations: Record<number, { chainName: string; nativeCurrency: { name: string; symbol: string; decimals: number }; rpcUrls: string[]; blockExplorerUrls: string[] }> = {
-          1: { // Ethereum Mainnet
-            chainName: 'Ethereum Mainnet',
-            nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-            rpcUrls: ['https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID'],
-            blockExplorerUrls: ['https://etherscan.io'],
-          },
           8453: { // Base Mainnet
             chainName: 'Base',
             nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
