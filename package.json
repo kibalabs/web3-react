@@ -18,12 +18,12 @@
   "dependencies": {
     "@kibalabs/core": "^0.6.3-next.6",
     "@kibalabs/core-react": "^0.9.7-next.3",
-    "ethers": "^6.14.1"
+    "ethers": "^6.15.0"
   },
   "devDependencies": {
     "@kibalabs/build": "0.13.3-next.10",
-    "@types/react": "19.1.4",
-    "@types/react-dom": "19.1.5",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

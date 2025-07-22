@@ -1,10 +1,10 @@
 import React from 'react';
 
 import { dateToString, LocalStorageClient } from '@kibalabs/core';
-import { IMultiAnyChildProps, useInitialization } from '@kibalabs/core-react';
-import { Eip1193Provider, BrowserProvider as EthersBrowserProvider, JsonRpcApiProvider as EthersJsonRpcApiProvider } from 'ethers';
+import { IMultiAnyChildProps, useEventListener, useInitialization } from '@kibalabs/core-react';
+import { Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
 
-import { Web3Provider, Web3Signer } from './model';
+import { Eip6963AnnounceProviderEvent, Eip6963ProviderDetail, Web3Provider, Web3Signer } from './model';
 
 export type Web3Account = {
   address: string;
@@ -21,6 +21,8 @@ type Web3AccountControl = {
   web3ChainId: number | undefined | null;
   web3Account: Web3Account | undefined | null;
   web3LoginSignature: Web3LoginSignature | undefined | null;
+  providers: Eip6963ProviderDetail[];
+  chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => void;
   onWeb3LoginClicked: () => Promise<Web3LoginSignature | null>;
 }
@@ -34,26 +36,105 @@ interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
 
 export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
   const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
-  const [web3, setWeb3] = React.useState<EthersBrowserProvider | null | undefined>(undefined);
   const [web3ChainId, setWeb3ChainId] = React.useState<number | null | undefined>(undefined);
   const [web3Account, setWeb3Account] = React.useState<Web3Account | undefined | null>(undefined);
   const [loginCount, setLoginCount] = React.useState<number>(0);
+  const [providers, setProviders] = React.useState<Eip6963ProviderDetail[] | undefined>(undefined);
+  const [isWaitingToLinkAccount, setIsWaitingToLinkAccount] = React.useState<boolean>(false);
   const onError = props.onError;
 
-  const loadWeb3 = async (): Promise<void> => {
-    // NOTE(krishan711): keep an eye on how metamask provider does this: https://github.com/MetaMask/detect-provider/blob/main/src/index.ts
-    // NOTE(krishan711): could use ethers.getDefaultProvider() for non-wallet scenarios
-    // @ts-expect-error
-    const provider = window.ethereum != null ? new EthersBrowserProvider(window.ethereum) : null;
-    if (!provider) {
-      setWeb3Account(null);
-      setEip1193Provider(null);
+  const chooseEip1193Provider = React.useCallback((eip1193ProviderRdns: string): void => {
+    if (eip1193Provider != null) {
       return;
     }
-    setWeb3(provider);
+    const provider = providers?.find((providerDetail: Eip6963ProviderDetail): boolean => providerDetail.info.rdns === eip1193ProviderRdns);
+    if (provider) {
+      setEip1193Provider(provider.provider);
+      // Save the chosen provider to localStorage
+      props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', eip1193ProviderRdns);
+    } else {
+      setEip1193Provider(null);
+      // Clear the saved provider if not found
+      props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+    }
+  }, [eip1193Provider, providers, props.localStorageClient]);
+
+  const web3 = React.useMemo((): Web3Provider | undefined | null => {
+    if (eip1193Provider == null) {
+      return null;
+    }
+    return new EthersBrowserProvider(eip1193Provider);
+  }, [eip1193Provider]);
+
+  useEventListener(window, 'eip6963:announceProvider', (event: Event): void => {
+    const parsedEvent = event as Eip6963AnnounceProviderEvent;
+    setProviders((prevProviders: Eip6963ProviderDetail[] | undefined): Eip6963ProviderDetail[] => {
+      const previousProviders = prevProviders ?? [];
+      const existingProviderIndex = previousProviders.findIndex((provider: Eip6963ProviderDetail): boolean => provider.info.uuid === parsedEvent.detail.info.uuid);
+      if (existingProviderIndex >= 0) {
+        const newProviders = [...previousProviders];
+        newProviders[existingProviderIndex] = parsedEvent.detail;
+        return newProviders;
+      }
+      return [...previousProviders, parsedEvent.detail];
+    });
+  });
+
+  const loadWeb3 = async (): Promise<void> => {
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+    // NOTE(krishan711): need to keep window.ethereum as a fallback option
     // @ts-expect-error
-    setEip1193Provider(window.ethereum);
+    const provider = window.ethereum != null ? new EthersBrowserProvider(window.ethereum) : null;
+    if (provider) {
+      const newProvider: Eip6963ProviderDetail = {
+        info: {
+          uuid: 'ethers',
+          name: 'Injected wallet',
+          icon: "data:image/svg+xml,%3Csvg width='500' height='500' viewBox='0 0 500 500' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_13_2)'%3E%3Crect width='500' height='500' rx='250' fill='white'/%3E%3Cpath d='M356.875 175.188H143.125C125.417 175.188 111.062 189.542 111.062 207.25V335.5C111.062 353.208 125.417 367.562 143.125 367.562H356.875C374.583 367.562 388.938 353.208 388.938 335.5V207.25C388.938 189.542 374.583 175.188 356.875 175.188Z' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M353.776 175.187V155.148C353.774 150.234 352.688 145.38 350.594 140.933C348.501 136.486 345.452 132.556 341.664 129.424C337.877 126.291 333.445 124.033 328.685 122.81C323.925 121.588 318.953 121.431 314.125 122.351L138.209 152.376C130.569 153.832 123.677 157.908 118.722 163.902C113.766 169.895 111.057 177.43 111.063 185.207V217.937' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M324.813 292.75C320.585 292.75 316.452 291.496 312.937 289.148C309.422 286.799 306.682 283.461 305.065 279.555C303.447 275.649 303.023 271.351 303.848 267.205C304.673 263.059 306.709 259.25 309.698 256.261C312.687 253.271 316.496 251.235 320.642 250.411C324.789 249.586 329.087 250.009 332.992 251.627C336.898 253.245 340.236 255.985 342.585 259.5C344.934 263.015 346.188 267.147 346.188 271.375C346.188 277.044 343.936 282.481 339.927 286.489C335.918 290.498 330.482 292.75 324.813 292.75Z' fill='black'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_13_2'%3E%3Crect width='500' height='500' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A",
+          rdns: 'ethers',
+        },
+        // @ts-expect-error
+        provider: window.ethereum,
+      };
+      setProviders((prevProviders: Eip6963ProviderDetail[] | undefined): Eip6963ProviderDetail[] => {
+        const previousProviders = prevProviders ?? [];
+        const existingProviderIndex = previousProviders.findIndex((p: Eip6963ProviderDetail): boolean => p.info.rdns === 'ethers');
+        if (existingProviderIndex >= 0) {
+          const newProviders = [...previousProviders];
+          newProviders[existingProviderIndex] = newProvider;
+          return newProviders;
+        }
+        return [...previousProviders, newProvider];
+      });
+    }
   };
+
+  useInitialization((): void => {
+    loadWeb3();
+  });
+
+  const autoReconnectProvider = React.useCallback((): void => {
+    if (eip1193Provider != null || providers === undefined) {
+      return;
+    }
+    const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+    if (savedProviderRdns && providers.length > 0) {
+      const savedProvider = providers.find((provider: Eip6963ProviderDetail): boolean => provider.info.rdns === savedProviderRdns);
+      if (savedProvider) {
+        setEip1193Provider(savedProvider.provider);
+      } else {
+        props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+      }
+    } else {
+      setWeb3Account(null);
+      setEip1193Provider(null);
+    }
+  }, [providers, props.localStorageClient, eip1193Provider]);
+
+  // Auto-reconnect when providers are loaded
+  React.useEffect((): void => {
+    autoReconnectProvider();
+  }, [autoReconnectProvider]);
 
   const onChainChanged = React.useCallback(async (): Promise<void> => {
     // NOTE(krishan711): phantom wallet seems to hit these callbacks straight away, so dont reload here unless we have already initialised
@@ -68,10 +149,11 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       return;
     }
     const potentialLinkedWeb3Accounts: (Web3Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<Web3Signer | null> => {
-      if (!(web3 instanceof EthersJsonRpcApiProvider)) {
-        return Promise.resolve(null);
-      }
-      return (web3 as EthersJsonRpcApiProvider).getSigner(web3AccountAddress);
+      // if (!(web3 instanceof EthersJsonRpcApiProvider)) {
+      //   return Promise.resolve(null);
+      // }
+      // @ts-expect-error
+      return web3.getSigner(web3AccountAddress);
     }));
     const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
     if (linkedWeb3Accounts.length === 0) {
@@ -88,8 +170,10 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
+    // @ts-expect-error
     const newWeb3AccountAddresses = await web3.send('eth_accounts', []);
     onWeb3AccountsChanged(newWeb3AccountAddresses);
+    // @ts-expect-error
     const newChainId = await web3.send('eth_chainId', []);
     setWeb3ChainId(Number(newChainId));
   }, [web3, onWeb3AccountsChanged]);
@@ -114,11 +198,12 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
 
   const onLinkWeb3AccountsClicked = React.useCallback(async (): Promise<void> => {
     if (!web3) {
+      setIsWaitingToLinkAccount(true);
       return;
     }
     // @ts-expect-error
     web3.send('eth_requestAccounts').then(async (): Promise<void> => {
-      await loadWeb3();
+      await loadWeb3Accounts();
     }).catch((error: unknown): void => {
       if ((error as Error).message?.includes('wallet_requestPermissions')) {
         onError(new Error('WALLET_REQUEST_ALREADY_OPEN'));
@@ -126,7 +211,14 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
         onError(new Error('WALLET_CONNECTION_FAILED'));
       }
     });
-  }, [web3, onError]);
+  }, [web3, onError, loadWeb3Accounts]);
+
+  React.useEffect((): void => {
+    if (isWaitingToLinkAccount && web3) {
+      setIsWaitingToLinkAccount(false);
+      onLinkWeb3AccountsClicked();
+    }
+  }, [isWaitingToLinkAccount, web3, onLinkWeb3AccountsClicked]);
 
   const web3LoginSignature = React.useMemo((): Web3LoginSignature | null => {
     if (!web3Account || loginCount < 0) {
@@ -165,11 +257,7 @@ Date: ${dateToString(new Date())}
     return null;
   }, [web3Account, props.localStorageClient, loginCount]);
 
-  useInitialization((): void => {
-    loadWeb3();
-  });
-
-  const providerValue = React.useMemo(() => ({ web3Account, web3LoginSignature, onLinkWeb3AccountsClicked, onWeb3LoginClicked, web3, web3ChainId }), [web3Account, web3LoginSignature, onLinkWeb3AccountsClicked, onWeb3LoginClicked, web3, web3ChainId]);
+  const providerValue = React.useMemo((): Web3AccountControl => ({ web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, chooseEip1193Provider, web3, web3ChainId }), [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, web3, web3ChainId]);
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
@@ -224,4 +312,12 @@ export const useWeb3ChainId = (): number | undefined | null => {
     throw Error('web3AccountsControl has not been initialized correctly.');
   }
   return web3AccountsControl.web3ChainId;
+};
+
+export const useWeb3Providers = (): [Eip6963ProviderDetail[], ((eip1193ProviderRdns: string) => void)] => {
+  const web3AccountsControl = React.useContext(Web3AccountContext);
+  if (!web3AccountsControl) {
+    throw Error('web3AccountsControl has not been initialized correctly.');
+  }
+  return [web3AccountsControl.providers, web3AccountsControl.chooseEip1193Provider];
 };
