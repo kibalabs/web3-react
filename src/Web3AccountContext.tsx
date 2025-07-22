@@ -242,12 +242,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
             rpcUrls: ['https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID'],
             blockExplorerUrls: ['https://etherscan.io'],
           },
-          137: { // Polygon Mainnet
-            chainName: 'Polygon Mainnet',
-            nativeCurrency: { name: 'Matic', symbol: 'MATIC', decimals: 18 },
-            rpcUrls: ['https://polygon-rpc.com'],
-            blockExplorerUrls: ['https://polygonscan.com'],
-          },
           8453: { // Base Mainnet
             chainName: 'Base',
             nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
@@ -258,9 +252,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
 
         const chainConfig = chainConfigurations[chainId];
         if (!chainConfig) {
-          throw new Error(`Unsupported chainId: ${chainId}`);
+          throw error;
         }
-
         await web3.send('wallet_addEthereumChain', [{
           chainId: `0x${chainId.toString(16)}`,
           ...chainConfig,
