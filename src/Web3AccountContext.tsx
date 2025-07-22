@@ -106,6 +106,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
         }
         return [...previousProviders, newProvider];
       });
+    } else {
+      setProviders([]);
     }
   };
 
