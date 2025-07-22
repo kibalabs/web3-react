@@ -1,5 +1,4 @@
-import { Contract as EthersContract, InterfaceAbi as EthersInterfaceAbi, Provider as EthersProvider, Signer as EthersSigner, TransactionReceipt as EthersTransactionReceipt, TransactionResponse as EthersTransactionResponse } from 'ethers';
-import { Eip1193Provider } from 'ethers';
+import { Eip1193Provider, Contract as EthersContract, InterfaceAbi as EthersInterfaceAbi, Provider as EthersProvider, Signer as EthersSigner, TransactionReceipt as EthersTransactionReceipt, TransactionResponse as EthersTransactionResponse } from 'ethers';
 
 export type Web3Signer = EthersSigner;
 export type Web3Provider = EthersProvider;
@@ -21,6 +20,6 @@ export interface Eip6963ProviderDetail {
 }
 
 export interface Eip6963AnnounceProviderEvent extends CustomEvent {
-  type: "eip6963:announceProvider";
+  type: 'eip6963:announceProvider';
   detail: Eip6963ProviderDetail;
 }
