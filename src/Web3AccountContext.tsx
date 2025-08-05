@@ -30,7 +30,7 @@ type Web3AccountControl = {
   web3LoginSignature: Web3LoginSignature | undefined | null;
   providers: Eip6963ProviderDetail[];
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
-  onLinkWeb3AccountsClicked: () => void;
+  onLinkWeb3AccountsClicked: () => Promise<boolean>;
   onWeb3LoginClicked: () => Promise<Web3LoginSignature | null>;
   onSwitchToChainIdClicked: (chainId: number) => Promise<void>;
 }
@@ -49,23 +49,23 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const [loginCount, setLoginCount] = React.useState<number>(0);
   const [providers, setProviders] = React.useState<Eip6963ProviderDetail[] | undefined>(undefined);
   const [isWaitingToLinkAccount, setIsWaitingToLinkAccount] = React.useState<boolean>(false);
+  const providersRef = React.useRef<Eip6963ProviderDetail[] | undefined>(undefined);
+  providersRef.current = providers;
   const onError = props.onError;
 
   const chooseEip1193Provider = React.useCallback((eip1193ProviderRdns: string): void => {
     if (eip1193Provider != null) {
       return;
     }
-    const provider = providers?.find((providerDetail: Eip6963ProviderDetail): boolean => providerDetail.info.rdns === eip1193ProviderRdns);
+    const provider = providersRef.current?.find((providerDetail: Eip6963ProviderDetail): boolean => providerDetail.info.rdns === eip1193ProviderRdns);
     if (provider) {
       setEip1193Provider(provider.provider);
-      // Save the chosen provider to localStorage
       props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', eip1193ProviderRdns);
     } else {
       setEip1193Provider(null);
-      // Clear the saved provider if not found
       props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
     }
-  }, [eip1193Provider, providers, props.localStorageClient]);
+  }, [eip1193Provider, providersRef, props.localStorageClient]);
 
   const web3 = React.useMemo((): EthersBrowserProvider | undefined | null => {
     if (eip1193Provider == null) {
@@ -200,20 +200,23 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     monitorWeb3AccountChanges();
   }, [monitorWeb3AccountChanges]);
 
-  const onLinkWeb3AccountsClicked = React.useCallback(async (): Promise<void> => {
-    if (!web3) {
+  const onLinkWeb3AccountsClicked = React.useCallback(async (): Promise<boolean> => {
+    if (web3 == null) {
       setIsWaitingToLinkAccount(true);
-      return;
+      return false;
     }
-    web3.send('eth_requestAccounts', []).then(async (): Promise<void> => {
+    try {
+      await web3.send('eth_requestAccounts', []);
       await loadWeb3Accounts();
-    }).catch((error: unknown): void => {
+      return true;
+    } catch (error: unknown) {
       if ((error as Error).message?.includes('wallet_requestPermissions')) {
         onError(new Error('WALLET_REQUEST_ALREADY_OPEN'));
       } else {
         onError(new Error('WALLET_CONNECTION_FAILED'));
       }
-    });
+    }
+    return false;
   }, [web3, onError, loadWeb3Accounts]);
 
   React.useEffect((): void => {
@@ -222,7 +225,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       onLinkWeb3AccountsClicked();
     }
   }, [isWaitingToLinkAccount, web3, onLinkWeb3AccountsClicked]);
-
 
   const onSwitchToChainIdClicked = React.useCallback(async (chainId: number): Promise<void> => {
     if (!web3) {
@@ -320,7 +322,7 @@ export const useWeb3Account = (): Web3Account | undefined | null => {
   return web3AccountsControl.web3Account;
 };
 
-export const useOnLinkWeb3AccountsClicked = (): (() => void) => {
+export const useOnLinkWeb3AccountsClicked = (): (() => Promise<boolean>) => {
   const web3AccountsControl = React.useContext(Web3AccountContext);
   if (!web3AccountsControl) {
     throw Error('web3AccountsControl has not been initialized correctly.');
