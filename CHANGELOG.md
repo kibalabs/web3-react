@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MAJOR] Refactored Web3AccountContext to use eip-6963
 - [MINOR] Added `useWeb3Providers` and `useOnSwitchToWeb3ChainIdClicked`
 - [MINOR] Added `onSwitchToChainIdClicked` to `Web3AccountContext` to allow switching chains
+- [MAJOR] Updated default message to be SIWE compliant
 
 ### Removed
 

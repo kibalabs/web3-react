@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { dateToString, LocalStorageClient } from '@kibalabs/core';
+import { dateToString, generateRandomString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useEventListener, useInitialization } from '@kibalabs/core-react';
 import { Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
 
@@ -31,7 +31,7 @@ type Web3AccountControl = {
   providers: Eip6963ProviderDetail[];
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => Promise<boolean>;
-  onWeb3LoginClicked: () => Promise<Web3LoginSignature | null>;
+  onWeb3LoginClicked: (statement?: string) => Promise<Web3LoginSignature | null>;
   onSwitchToChainIdClicked: (chainId: number) => Promise<void>;
 }
 
@@ -77,20 +77,20 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   useEventListener(window, 'eip6963:announceProvider', (event: Event): void => {
     const parsedEvent = event as Eip6963AnnounceProviderEvent;
     setProviders((prevProviders: Eip6963ProviderDetail[] | undefined): Eip6963ProviderDetail[] => {
-      const previousProviders = prevProviders ?? [];
-      const existingProviderIndex = previousProviders.findIndex((provider: Eip6963ProviderDetail): boolean => provider.info.uuid === parsedEvent.detail.info.uuid);
+      const newProviders = [...prevProviders ?? []];
+      const existingProviderIndex = newProviders.findIndex((provider: Eip6963ProviderDetail): boolean => provider.info.uuid === parsedEvent.detail.info.uuid);
       if (existingProviderIndex >= 0) {
-        const newProviders = [...previousProviders];
         newProviders[existingProviderIndex] = parsedEvent.detail;
         return newProviders;
       }
-      return [...previousProviders, parsedEvent.detail];
+      newProviders.push(parsedEvent.detail);
+      return newProviders;
     });
   });
 
   const loadWeb3 = async (): Promise<void> => {
     window.dispatchEvent(new Event('eip6963:requestProvider'));
-    // NOTE(krishan711): need to keep window.ethereum as a fallback option
+    // NOTE(krishan711): need to keep window.ethereum as a fallback option for injected wallet
     if (window.ethereum != null) {
       const newProvider: Eip6963ProviderDetail = {
         info: {
@@ -273,18 +273,30 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     return signature as Web3LoginSignature;
   }, [web3Account, loginCount, props.localStorageClient]);
 
-  const onWeb3LoginClicked = React.useCallback(async (): Promise<Web3LoginSignature | null> => {
+  const onWeb3LoginClicked = React.useCallback(async (statment?: string): Promise<Web3LoginSignature | null> => {
     if (!web3Account) {
       return null;
     }
-    const message = `This one-time signature simply proves you're the owner of the wallet address for use with Token Page:
-
-${web3Account.address}
-
-Signature signings do not affect your assets in any way.
-
-Date: ${dateToString(new Date())}
-    `;
+    // NOTE(krishan711): SIWE compliant message: https://eips.ethereum.org/EIPS/eip-4361
+    let messageParts: string[] = [
+      `${window.location.origin} wants you to sign in with your Ethereum account:`,
+      `${web3Account.address}`,
+      '',
+    ];
+    if (statment) {
+      messageParts = messageParts.concat([
+        statment,
+        '',
+      ]);
+    }
+    messageParts = messageParts.concat([
+      `URI: ${window.location.href}`,
+      'Version: 1',
+      `Chain ID: ${web3ChainId}`,
+      `Nonce: ${generateRandomString(16)}`,
+      `Issued At: ${dateToString(new Date())}`,
+    ]);
+    const message = messageParts.join('\n');
     try {
       const signature = await web3Account.signer.signMessage(message);
       const newWeb3LoginSignature = { message, signature };
@@ -295,7 +307,7 @@ Date: ${dateToString(new Date())}
       console.error(error);
     }
     return null;
-  }, [web3Account, props.localStorageClient, loginCount]);
+  }, [web3Account, web3ChainId, props.localStorageClient, loginCount]);
 
   const providerValue = React.useMemo((): Web3AccountControl => ({ web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId }), [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
 
@@ -330,7 +342,7 @@ export const useOnLinkWeb3AccountsClicked = (): (() => Promise<boolean>) => {
   return web3AccountsControl.onLinkWeb3AccountsClicked;
 };
 
-export const useWeb3OnLoginClicked = (): (() => Promise<Web3LoginSignature | null>) => {
+export const useWeb3OnLoginClicked = (): ((statement?: string) => Promise<Web3LoginSignature | null>) => {
   const web3AccountsControl = React.useContext(Web3AccountContext);
   if (!web3AccountsControl) {
     throw Error('web3AccountsControl has not been initialized correctly.');
