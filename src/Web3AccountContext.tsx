@@ -277,7 +277,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (!web3Account) {
       return null;
     }
-    const uri = shouldIncludeProtocol ? window.location.origin : window.location.host;
+    const uri = shouldIncludeProtocol || window.location.protocol !== 'https:' ? window.location.origin : window.location.host;
     // NOTE(krishan711): SIWE compliant message: https://eips.ethereum.org/EIPS/eip-4361
     let messageParts: string[] = [
       `${uri} wants you to sign in with your Ethereum account:`,
