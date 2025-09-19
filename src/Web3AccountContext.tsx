@@ -31,7 +31,7 @@ type Web3AccountControl = {
   providers: Eip6963ProviderDetail[];
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => Promise<boolean>;
-  onWeb3LoginClicked: (statement?: string) => Promise<Web3LoginSignature | null>;
+  onWeb3LoginClicked: (statement?: string, shouldIncludeProtocol?: boolean) => Promise<Web3LoginSignature | null>;
   onSwitchToChainIdClicked: (chainId: number) => Promise<void>;
 }
 
@@ -273,13 +273,14 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     return signature as Web3LoginSignature;
   }, [web3Account, loginCount, props.localStorageClient]);
 
-  const onWeb3LoginClicked = React.useCallback(async (statment?: string): Promise<Web3LoginSignature | null> => {
+  const onWeb3LoginClicked = React.useCallback(async (statment?: string, shouldIncludeProtocol?: boolean): Promise<Web3LoginSignature | null> => {
     if (!web3Account) {
       return null;
     }
+    const uri = shouldIncludeProtocol ? window.location.origin : window.location.host;
     // NOTE(krishan711): SIWE compliant message: https://eips.ethereum.org/EIPS/eip-4361
     let messageParts: string[] = [
-      `${window.location.origin} wants you to sign in with your Ethereum account:`,
+      `${uri} wants you to sign in with your Ethereum account:`,
       `${web3Account.address}`,
       '',
     ];
@@ -290,7 +291,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       ]);
     }
     messageParts = messageParts.concat([
-      `URI: ${window.location.href}`,
+      `URI: ${uri}`,
       'Version: 1',
       `Chain ID: ${web3ChainId}`,
       `Nonce: ${generateRandomString(16)}`,
@@ -342,7 +343,7 @@ export const useOnLinkWeb3AccountsClicked = (): (() => Promise<boolean>) => {
   return web3AccountsControl.onLinkWeb3AccountsClicked;
 };
 
-export const useWeb3OnLoginClicked = (): ((statement?: string) => Promise<Web3LoginSignature | null>) => {
+export const useWeb3OnLoginClicked = (): ((statement?: string, shouldIncludeProtocol?: boolean) => Promise<Web3LoginSignature | null>) => {
   const web3AccountsControl = React.useContext(Web3AccountContext);
   if (!web3AccountsControl) {
     throw Error('web3AccountsControl has not been initialized correctly.');
