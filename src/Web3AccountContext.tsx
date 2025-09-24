@@ -1,8 +1,9 @@
 import React from 'react';
 
+import { createBaseAccountSDK } from '@base-org/account';
 import { dateToString, generateRandomString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useEventListener, useInitialization } from '@kibalabs/core-react';
-import { Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
+import { BrowserProvider, Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
 
 import { Eip6963AnnounceProviderEvent, Eip6963ProviderDetail, Web3Provider, Web3Signer } from './model';
 
@@ -31,6 +32,7 @@ type Web3AccountControl = {
   providers: Eip6963ProviderDetail[];
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => Promise<boolean>;
+  onWeb3BaseLoginClicked: (chainId: number, statement: string, appName: string, appLogUrl: string) => Promise<Web3LoginSignature | null>;
   onWeb3LoginClicked: (statement?: string, shouldIncludeProtocol?: boolean) => Promise<Web3LoginSignature | null>;
   onSwitchToChainIdClicked: (chainId: number) => Promise<void>;
 }
@@ -120,11 +122,54 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     loadWeb3();
   });
 
-  const autoReconnectProvider = React.useCallback((): void => {
+  const autoReconnectBaseProvider = React.useCallback(async (): Promise<boolean> => {
+    const baseConnectionString = props.localStorageClient.getValue('web3Account-baseConnection');
+    if (!baseConnectionString) {
+      props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+      return false;
+    }
+    try {
+      const baseConnection = JSON.parse(baseConnectionString);
+      const { address, chainId, appName, appLogoUrl } = baseConnection;
+      const signatureString = props.localStorageClient.getValue(`web3Account-signature-${address}`);
+      if (!signatureString) {
+        return false;
+      }
+      const sdk = createBaseAccountSDK({
+        appName,
+        appLogoUrl,
+        appChainIds: [chainId],
+      });
+      const browserProvider = new BrowserProvider(sdk.getProvider());
+      const signer = await browserProvider.getSigner();
+      const currentAddress = await signer.getAddress();
+      if (currentAddress.toLowerCase() === address.toLowerCase()) {
+        setWeb3Account({ address: currentAddress, signer });
+        setEip1193Provider(sdk.getProvider());
+        setLoginCount((prev) => prev + 1);
+        return true;
+      }
+    } catch (parseError) {
+      console.error('Invalid Base connection data:', parseError);
+      props.localStorageClient.removeValue('web3Account-baseConnection');
+      props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+    }
+    return false;
+  }, [props.localStorageClient]);
+
+  const autoReconnectProvider = React.useCallback(async (): Promise<void> => {
     if (eip1193Provider != null || providers === undefined) {
       return;
     }
     const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+    if (savedProviderRdns === 'base') {
+      const baseReconnected = await autoReconnectBaseProvider();
+      if (!baseReconnected) {
+        setWeb3Account(null);
+        setEip1193Provider(null);
+      }
+      return;
+    }
     if (savedProviderRdns && providers.length > 0) {
       const savedProvider = providers.find((provider: Eip6963ProviderDetail): boolean => provider.info.rdns === savedProviderRdns);
       if (savedProvider) {
@@ -136,9 +181,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       setWeb3Account(null);
       setEip1193Provider(null);
     }
-  }, [providers, props.localStorageClient, eip1193Provider]);
+  }, [providers, props.localStorageClient, eip1193Provider, autoReconnectBaseProvider]);
 
-  // Auto-reconnect when providers are loaded
   React.useEffect((): void => {
     autoReconnectProvider();
   }, [autoReconnectProvider]);
@@ -164,13 +208,19 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
     if (linkedWeb3Accounts.length === 0) {
       setWeb3Account(null);
+      // NOTE(krishan711): Clean up Base connection if it was a Base provider
+      const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+      if (savedProviderRdns === 'base') {
+        props.localStorageClient.removeValue('web3Account-baseConnection');
+        props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+      }
       return;
     }
     // NOTE(krishan711): metamask only deals with one web3Account at the moment but returns an array for future compatibility
     const linkedWeb3Account = linkedWeb3Accounts[0];
     const linkedWeb3AccountAddress = await linkedWeb3Account.getAddress();
     setWeb3Account({ address: linkedWeb3AccountAddress, signer: linkedWeb3Account });
-  }, [web3]);
+  }, [web3, props.localStorageClient]);
 
   const loadWeb3Accounts = React.useCallback(async (): Promise<void> => {
     if (!web3) {
@@ -273,23 +323,74 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     return signature as Web3LoginSignature;
   }, [web3Account, loginCount, props.localStorageClient]);
 
-  const onWeb3LoginClicked = React.useCallback(async (statment?: string, shouldIncludeProtocol?: boolean): Promise<Web3LoginSignature | null> => {
+  const onWeb3BaseLoginClicked = React.useCallback(async (chainId: number, statement: string, appName: string, appLogoUrl: string): Promise<Web3LoginSignature | null> => {
+    const sdk = createBaseAccountSDK({
+      appName,
+      appLogoUrl,
+      appChainIds: [chainId],
+    });
+    const uri = window.location.protocol !== 'https:' ? window.location.origin : window.location.host;
+    const actualStatement = statement || `Sign in to ${appName}.`;
+    try {
+      const response = await sdk.getProvider().request({
+        method: 'wallet_connect',
+        params: [{
+          version: '1',
+          capabilities: {
+            signInWithEthereum: {
+              version: '1',
+              uri,
+              statement: actualStatement,
+              nonce: generateRandomString(16),
+              chainId: `0x${chainId.toString(16)}`,
+              issuedAt: dateToString(new Date()),
+            },
+          },
+        }],
+      });
+      // @ts-expect-error
+      const address = response.accounts[0].address;
+      // @ts-expect-error
+      const message = response.accounts[0].capabilities.signInWithEthereum.message;
+      // @ts-expect-error
+      const signature = response.accounts[0].capabilities.signInWithEthereum.signature;
+      const newWeb3LoginSignature = { message, signature };
+      props.localStorageClient.setValue(`web3Account-signature-${address}`, JSON.stringify(newWeb3LoginSignature));
+      setLoginCount(loginCount + 1);
+      const browserProvider = new BrowserProvider(sdk.getProvider());
+      const signer = await browserProvider.getSigner();
+      setWeb3Account({ address, signer });
+      setEip1193Provider(sdk.getProvider());
+      const baseConnectionState = {
+        address,
+        chainId,
+        appName,
+        appLogoUrl,
+        isBaseProvider: true,
+      };
+      props.localStorageClient.setValue('web3Account-baseConnection', JSON.stringify(baseConnectionState));
+      props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', 'base');
+      return newWeb3LoginSignature;
+    } catch (error) {
+      console.error('Sign in failed:', error);
+    }
+    return null;
+  }, [loginCount, props.localStorageClient]);
+
+  const onWeb3LoginClicked = React.useCallback(async (statement?: string, shouldIncludeProtocol?: boolean): Promise<Web3LoginSignature | null> => {
     if (!web3Account) {
       return null;
     }
     const uri = (shouldIncludeProtocol || window.location.protocol !== 'https:') ? window.location.origin : window.location.host;
+    const actualStatement = statement ?? 'Sign in to the app.';
     // NOTE(krishan711): SIWE compliant message: https://eips.ethereum.org/EIPS/eip-4361
     let messageParts: string[] = [
       `${uri} wants you to sign in with your Ethereum account:`,
       `${web3Account.address}`,
       '',
+      actualStatement,
+      '',
     ];
-    if (statment) {
-      messageParts = messageParts.concat([
-        statment,
-        '',
-      ]);
-    }
     messageParts = messageParts.concat([
       `URI: ${uri}`,
       'Version: 1',
@@ -310,7 +411,9 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     return null;
   }, [web3Account, web3ChainId, props.localStorageClient, loginCount]);
 
-  const providerValue = React.useMemo((): Web3AccountControl => ({ web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId }), [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
+  const providerValue = React.useMemo((): Web3AccountControl => {
+    return { web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId };
+  }, [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
@@ -349,6 +452,14 @@ export const useWeb3OnLoginClicked = (): ((statement?: string, shouldIncludeProt
     throw Error('web3AccountsControl has not been initialized correctly.');
   }
   return web3AccountsControl.onWeb3LoginClicked;
+};
+
+export const useWeb3OnBaseLoginClicked = (): ((chainId: number, statement: string, appName: string, appLogoUrl: string) => Promise<Web3LoginSignature | null>) => {
+  const web3AccountsControl = React.useContext(Web3AccountContext);
+  if (!web3AccountsControl) {
+    throw Error('web3AccountsControl has not been initialized correctly.');
+  }
+  return web3AccountsControl.onWeb3BaseLoginClicked;
 };
 
 export const useWeb3LoginSignature = (): Web3LoginSignature | undefined | null => {
