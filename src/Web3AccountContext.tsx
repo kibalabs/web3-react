@@ -339,7 +339,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           capabilities: {
             signInWithEthereum: {
               version: '1',
-              domain: domain,
+              domain,
               uri: window.location.origin,
               statement: actualStatement,
               nonce: generateRandomString(16),
