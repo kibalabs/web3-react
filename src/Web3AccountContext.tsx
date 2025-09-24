@@ -332,7 +332,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     const uri = window.location.protocol !== 'https:' ? window.location.origin : window.location.host;
     const actualStatement = statement || `Sign in to ${appName}.`;
     try {
-      const repsonse = await sdk.getProvider().request({
+      const response = await sdk.getProvider().request({
         method: 'wallet_connect',
         params: [{
           version: '1',
@@ -349,11 +349,11 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
         }],
       });
       // @ts-expect-error
-      const address = repsonse.accounts[0].address;
+      const address = response.accounts[0].address;
       // @ts-expect-error
-      const message = repsonse.accounts[0].capabilities.signInWithEthereum.message;
+      const message = response.accounts[0].capabilities.signInWithEthereum.message;
       // @ts-expect-error
-      const signature = repsonse.accounts[0].capabilities.signInWithEthereum.signature;
+      const signature = response.accounts[0].capabilities.signInWithEthereum.signature;
       const newWeb3LoginSignature = { message, signature };
       props.localStorageClient.setValue(`web3Account-signature-${address}`, JSON.stringify(newWeb3LoginSignature));
       setLoginCount(loginCount + 1);
