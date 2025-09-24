@@ -329,6 +329,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       appLogoUrl,
       appChainIds: [chainId],
     });
+    const domain = window.location.protocol !== 'https:' ? window.location.origin : window.location.host;
     const actualStatement = statement || `Sign in to ${appName}.`;
     try {
       const response = await sdk.getProvider().request({
@@ -338,7 +339,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           capabilities: {
             signInWithEthereum: {
               version: '1',
-              domain: window.location.host,
+              domain: domain,
               uri: window.location.origin,
               statement: actualStatement,
               nonce: generateRandomString(16),
@@ -381,10 +382,11 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (!web3Account) {
       return null;
     }
+    const domain = (shouldIncludeProtocol || window.location.protocol !== 'https:') ? window.location.origin : window.location.host;
     const actualStatement = statement ?? 'Sign in to the app.';
     // NOTE(krishan711): SIWE compliant message: https://eips.ethereum.org/EIPS/eip-4361
     let messageParts: string[] = [
-      `${window.location.host} wants you to sign in with your Ethereum account:`,
+      `${domain} wants you to sign in with your Ethereum account:`,
       `${web3Account.address}`,
       '',
       actualStatement,
