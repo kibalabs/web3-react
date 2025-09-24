@@ -392,7 +392,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       '',
     ];
     messageParts = messageParts.concat([
-      `URI: ${uri}`,
+      `URI: ${window.location.origin}`,
       'Version: 1',
       `Chain ID: ${web3ChainId}`,
       `Nonce: ${generateRandomString(16)}`,
