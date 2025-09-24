@@ -377,12 +377,12 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     return null;
   }, [loginCount, props.localStorageClient]);
 
-  const onWeb3LoginClicked = React.useCallback(async (statment?: string, shouldIncludeProtocol?: boolean): Promise<Web3LoginSignature | null> => {
+  const onWeb3LoginClicked = React.useCallback(async (statement?: string, shouldIncludeProtocol?: boolean): Promise<Web3LoginSignature | null> => {
     if (!web3Account) {
       return null;
     }
     const uri = (shouldIncludeProtocol || window.location.protocol !== 'https:') ? window.location.origin : window.location.host;
-    const actualStatement = statment ?? 'Sign in to the app.';
+    const actualStatement = statement ?? 'Sign in to the app.';
     // NOTE(krishan711): SIWE compliant message: https://eips.ethereum.org/EIPS/eip-4361
     let messageParts: string[] = [
       `${uri} wants you to sign in with your Ethereum account:`,
