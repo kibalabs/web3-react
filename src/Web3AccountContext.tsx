@@ -122,11 +122,59 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     loadWeb3();
   });
 
-  const autoReconnectProvider = React.useCallback((): void => {
+  const autoReconnectBaseProvider = React.useCallback(async (): Promise<boolean> => {
+    const baseConnectionString = props.localStorageClient.getValue('web3Account-baseConnection');
+    if (!baseConnectionString) {
+      props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+      return false;
+    }
+    try {
+      const baseConnection = JSON.parse(baseConnectionString);
+      const { address, chainId, appName, appLogoUrl } = baseConnection;
+      const signatureString = props.localStorageClient.getValue(`web3Account-signature-${address}`);
+      if (!signatureString) {
+        return false;
+      }
+      const sdk = createBaseAccountSDK({
+        appName,
+        appLogoUrl,
+        appChainIds: [chainId],
+      });
+      const browserProvider = new BrowserProvider(sdk.getProvider());
+      const signer = await browserProvider.getSigner();
+      const currentAddress = await signer.getAddress();
+      if (currentAddress.toLowerCase() === address.toLowerCase()) {
+        setWeb3Account({ address: currentAddress, signer });
+        setEip1193Provider(sdk.getProvider());
+        setLoginCount((prev) => prev + 1);
+        return true;
+      }
+    } catch (parseError) {
+      console.error('Invalid Base connection data:', parseError);
+      props.localStorageClient.removeValue('web3Account-baseConnection');
+      props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+    }
+    return false;
+  }, [props.localStorageClient]);
+
+  const autoReconnectProvider = React.useCallback(async (): Promise<void> => {
     if (eip1193Provider != null || providers === undefined) {
       return;
     }
+
     const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+
+    // Handle Base provider case
+    if (savedProviderRdns === 'base') {
+      const baseReconnected = await autoReconnectBaseProvider();
+      if (!baseReconnected) {
+        setWeb3Account(null);
+        setEip1193Provider(null);
+      }
+      return;
+    }
+
+    // Handle standard EIP-1193 providers
     if (savedProviderRdns && providers.length > 0) {
       const savedProvider = providers.find((provider: Eip6963ProviderDetail): boolean => provider.info.rdns === savedProviderRdns);
       if (savedProvider) {
@@ -138,9 +186,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       setWeb3Account(null);
       setEip1193Provider(null);
     }
-  }, [providers, props.localStorageClient, eip1193Provider]);
-
-  // Auto-reconnect when providers are loaded
+  }, [providers, props.localStorageClient, eip1193Provider, autoReconnectBaseProvider]); // Auto-reconnect when providers are loaded
   React.useEffect((): void => {
     autoReconnectProvider();
   }, [autoReconnectProvider]);
@@ -166,13 +212,19 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
     if (linkedWeb3Accounts.length === 0) {
       setWeb3Account(null);
+      // Clean up Base connection if it was a Base provider
+      const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+      if (savedProviderRdns === 'base') {
+        props.localStorageClient.removeValue('web3Account-baseConnection');
+        props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+      }
       return;
     }
     // NOTE(krishan711): metamask only deals with one web3Account at the moment but returns an array for future compatibility
     const linkedWeb3Account = linkedWeb3Accounts[0];
     const linkedWeb3AccountAddress = await linkedWeb3Account.getAddress();
     setWeb3Account({ address: linkedWeb3AccountAddress, signer: linkedWeb3Account });
-  }, [web3]);
+  }, [web3, props.localStorageClient]);
 
   const loadWeb3Accounts = React.useCallback(async (): Promise<void> => {
     if (!web3) {
@@ -313,6 +365,15 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       const signer = await browserProvider.getSigner();
       setWeb3Account({ address, signer });
       setEip1193Provider(sdk.getProvider());
+      const baseConnectionState = {
+        address,
+        chainId,
+        appName,
+        appLogoUrl,
+        isBaseProvider: true,
+      };
+      props.localStorageClient.setValue('web3Account-baseConnection', JSON.stringify(baseConnectionState));
+      props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', 'base');
       return newWeb3LoginSignature;
     } catch (error) {
       console.error('Sign in failed:', error);
