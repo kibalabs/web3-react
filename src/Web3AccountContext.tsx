@@ -161,10 +161,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (eip1193Provider != null || providers === undefined) {
       return;
     }
-
     const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
-
-    // Handle Base provider case
     if (savedProviderRdns === 'base') {
       const baseReconnected = await autoReconnectBaseProvider();
       if (!baseReconnected) {
@@ -173,8 +170,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       }
       return;
     }
-
-    // Handle standard EIP-1193 providers
     if (savedProviderRdns && providers.length > 0) {
       const savedProvider = providers.find((provider: Eip6963ProviderDetail): boolean => provider.info.rdns === savedProviderRdns);
       if (savedProvider) {
@@ -186,7 +181,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       setWeb3Account(null);
       setEip1193Provider(null);
     }
-  }, [providers, props.localStorageClient, eip1193Provider, autoReconnectBaseProvider]); // Auto-reconnect when providers are loaded
+  }, [providers, props.localStorageClient, eip1193Provider, autoReconnectBaseProvider]);
+
   React.useEffect((): void => {
     autoReconnectProvider();
   }, [autoReconnectProvider]);
@@ -212,7 +208,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     const linkedWeb3Accounts = potentialLinkedWeb3Accounts.filter((potentialSigner: Web3Signer | null): boolean => potentialSigner != null) as Web3Signer[];
     if (linkedWeb3Accounts.length === 0) {
       setWeb3Account(null);
-      // Clean up Base connection if it was a Base provider
+      // NOTE(krishan711): Clean up Base connection if it was a Base provider
       const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
       if (savedProviderRdns === 'base') {
         props.localStorageClient.removeValue('web3Account-baseConnection');
