@@ -238,6 +238,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     const newChainId = parseInt(newChainIdHex, 16);
     if (isNaN(newChainId)) {
       console.error(`Invalid chainId hex string: ${newChainIdHex}`);
+      setWeb3ChainId(null);
       return;
     }
     setWeb3ChainId(newChainId);
