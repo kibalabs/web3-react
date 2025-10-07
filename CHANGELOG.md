@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MINOR] Added `onSwitchToChainIdClicked` to `Web3AccountContext` to allow switching chains
 - [MAJOR] Updated default message to be SIWE compliant
 - [MINOR] Implemented login with base via `useWeb3OnBaseLoginClicked`
+- [MAJOR] Don't force refresh when the chainId changes
 
 ### Removed
 

@@ -114,6 +114,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
         return [...previousProviders, newProvider];
       });
     } else {
+      // NOTE(krishan711): this isn't great because it instantiates to empty but if there are no
+      // providers found the array would never be initialized
       setProviders([]);
     }
   };
@@ -187,14 +189,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     autoReconnectProvider();
   }, [autoReconnectProvider]);
 
-  const onChainChanged = React.useCallback(async (): Promise<void> => {
-    // NOTE(krishan711): phantom wallet seems to hit these callbacks straight away, so dont reload here unless we have already initialised
-    if (!web3 || !web3ChainId) {
-      return;
-    }
-    window.location.reload();
-  }, [web3, web3ChainId]);
-
   const onWeb3AccountsChanged = React.useCallback(async (web3AccountAddresses: string[]): Promise<void> => {
     if (!web3) {
       return;
@@ -235,6 +229,21 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   React.useEffect((): void => {
     loadWeb3Accounts();
   }, [loadWeb3Accounts]);
+
+  const onChainChanged = React.useCallback(async (newChainIdHex: string): Promise<void> => {
+    // NOTE(krishan711): phantom wallet seems to hit these callbacks straight away, so dont reload here unless we have already initialised
+    if (!web3 || !web3ChainId) {
+      return;
+    }
+    const newChainId = parseInt(newChainIdHex, 16);
+    if (Number.isNaN(newChainId)) {
+      console.error(`Invalid chainId hex string: ${newChainIdHex}`);
+      setWeb3ChainId(null);
+      return;
+    }
+    setWeb3ChainId(newChainId);
+    await loadWeb3Accounts();
+  }, [web3, web3ChainId, loadWeb3Accounts]);
 
   const monitorWeb3AccountChanges = React.useCallback(async (): Promise<void> => {
     if (!eip1193Provider) {
