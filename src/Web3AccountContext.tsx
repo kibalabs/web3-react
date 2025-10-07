@@ -235,7 +235,11 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (!web3 || !web3ChainId) {
       return;
     }
-    const newChainId = Number(newChainIdHex);
+    const newChainId = parseInt(newChainIdHex, 16);
+    if (isNaN(newChainId)) {
+      console.error(`Invalid chainId hex string: ${newChainIdHex}`);
+      return;
+    }
     setWeb3ChainId(newChainId);
     await loadWeb3Accounts();
   }, [web3, web3ChainId, loadWeb3Accounts]);
