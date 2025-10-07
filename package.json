@@ -16,17 +16,17 @@
     "dist/*"
   ],
   "dependencies": {
-    "@base-org/account": "^2.3.0",
+    "@base-org/account": "^2.3.1",
     "@kibalabs/core": "^0.6.3-next.6",
     "@kibalabs/core-react": "^0.9.7-next.3",
     "ethers": "^6.15.0"
   },
   "devDependencies": {
     "@kibalabs/build": "0.13.3-next.10",
-    "@types/react": "19.1.13",
-    "@types/react-dom": "19.1.9",
-    "react": "19.1.1",
-    "react-dom": "19.1.1"
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
