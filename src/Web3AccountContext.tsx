@@ -69,12 +69,16 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     }
   }, [eip1193Provider, providersRef, props.localStorageClient]);
 
+  // NOTE(krishan711): we need to depend on web3ChainId so that when the chain changes we recreate the provider
+  // this is required because ethers.js v6 throws an error if you use a provider after the network has changed
+  // see: https://github.com/ethers-io/ethers.js/issues/4506
   const web3 = React.useMemo((): EthersBrowserProvider | undefined | null => {
     if (eip1193Provider == null) {
       return null;
     }
+    console.log('Web3AccountContext: creating new BrowserProvider for chainId', web3ChainId);
     return new EthersBrowserProvider(eip1193Provider);
-  }, [eip1193Provider]);
+  }, [eip1193Provider, web3ChainId]);
 
   useEventListener(window, 'eip6963:announceProvider', (event: Event): void => {
     const parsedEvent = event as Eip6963AnnounceProviderEvent;
@@ -193,6 +197,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
+    console.log('Web3AccountContext: onWeb3AccountsChanged called, getting signers from provider');
     const potentialLinkedWeb3Accounts: (Web3Signer | null)[] = await Promise.all(web3AccountAddresses.map((web3AccountAddress: string): Promise<Web3Signer | null> => {
       // if (!(web3 instanceof EthersJsonRpcApiProvider)) {
       //   return Promise.resolve(null);
@@ -213,6 +218,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     // NOTE(krishan711): metamask only deals with one web3Account at the moment but returns an array for future compatibility
     const linkedWeb3Account = linkedWeb3Accounts[0];
     const linkedWeb3AccountAddress = await linkedWeb3Account.getAddress();
+    const signerNetwork = await linkedWeb3Account.provider?.getNetwork();
+    console.log('Web3AccountContext: updating web3Account signer for address', linkedWeb3AccountAddress, 'on chain', signerNetwork?.chainId?.toString());
     setWeb3Account({ address: linkedWeb3AccountAddress, signer: linkedWeb3Account });
   }, [web3, props.localStorageClient]);
 
@@ -220,6 +227,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (!web3) {
       return;
     }
+    console.log('Web3AccountContext: loadWeb3Accounts called');
     const newWeb3AccountAddresses = await web3.send('eth_accounts', []);
     onWeb3AccountsChanged(newWeb3AccountAddresses);
     const newChainId = await web3.send('eth_chainId', []);
@@ -241,9 +249,10 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       setWeb3ChainId(null);
       return;
     }
+    // NOTE(krishan711): setting the new chain id will trigger the web3 provider to be recreated (via the useMemo)
+    // and loadWeb3Accounts will be called via the useEffect that depends on web3
     setWeb3ChainId(newChainId);
-    await loadWeb3Accounts();
-  }, [web3, web3ChainId, loadWeb3Accounts]);
+  }, [web3, web3ChainId]);
 
   const monitorWeb3AccountChanges = React.useCallback(async (): Promise<void> => {
     if (!eip1193Provider) {
@@ -286,6 +295,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   }, [isWaitingToLinkAccount, web3, onLinkWeb3AccountsClicked]);
 
   const onSwitchToChainIdClicked = React.useCallback(async (chainId: number): Promise<void> => {
+    console.log('onSwitchToChainIdClicked', chainId)
     if (!web3) {
       throw new Error('No web3 provider available to switch chain');
     }
@@ -314,6 +324,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           ...chainConfig,
         }]);
       } else {
+        console.log('onSwitchToChainIdClicked error', error)
         throw error;
       }
     }

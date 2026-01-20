@@ -38,10 +38,13 @@ export const useWeb3Transaction = (): [Web3TransactionDetails, (newTransactionPr
     if (!transactionPromise) {
       return;
     }
+    console.log('waitForTransactionPromise', transactionPromise);
     try {
       const newTransaction = await transactionPromise;
+      console.log('newTransaction', newTransaction)
       setTransaction(newTransaction);
     } catch (newError: unknown) {
+      console.log('waitForTransactionPromise error', newError);
       setError(newError as Error);
     }
     setTransactionPromise(null);
@@ -55,10 +58,13 @@ export const useWeb3Transaction = (): [Web3TransactionDetails, (newTransactionPr
     if (!transaction) {
       return;
     }
+    console.log('waitForTransaction', transaction);
     try {
       const newReceipt = await transaction.wait();
+      console.log('newReceipt', newReceipt)
       setReceipt(newReceipt);
     } catch (newError: unknown) {
+      console.log('waitForTransaction error', newError);
       setError(newError as Error);
       setReceipt(null);
     }
