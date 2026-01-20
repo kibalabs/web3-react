@@ -250,7 +250,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       return;
     }
     // NOTE(krishan711): setting the new chain id will trigger the web3 provider to be recreated (via the useMemo)
-    // and loadWeb3Accounts will be called via the useEffect that depends on web3
     setWeb3ChainId(newChainId);
   }, [web3, web3ChainId]);
 
@@ -295,7 +294,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   }, [isWaitingToLinkAccount, web3, onLinkWeb3AccountsClicked]);
 
   const onSwitchToChainIdClicked = React.useCallback(async (chainId: number): Promise<void> => {
-    console.log('onSwitchToChainIdClicked', chainId)
     if (!web3) {
       throw new Error('No web3 provider available to switch chain');
     }
@@ -324,7 +322,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           ...chainConfig,
         }]);
       } else {
-        console.log('onSwitchToChainIdClicked error', error)
         throw error;
       }
     }
