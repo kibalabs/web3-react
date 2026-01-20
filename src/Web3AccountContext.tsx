@@ -69,12 +69,16 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     }
   }, [eip1193Provider, providersRef, props.localStorageClient]);
 
+  // NOTE(krishan711): we need to depend on web3ChainId so that when the chain changes we recreate the provider
+  // this is required because ethers.js v6 throws an error if you use a provider after the network has changed
+  // see: https://github.com/ethers-io/ethers.js/issues/4506
   const web3 = React.useMemo((): EthersBrowserProvider | undefined | null => {
     if (eip1193Provider == null) {
       return null;
     }
     return new EthersBrowserProvider(eip1193Provider);
-  }, [eip1193Provider]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eip1193Provider, web3ChainId]);
 
   useEventListener(window, 'eip6963:announceProvider', (event: Event): void => {
     const parsedEvent = event as Eip6963AnnounceProviderEvent;
@@ -241,9 +245,9 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       setWeb3ChainId(null);
       return;
     }
+    // NOTE(krishan711): setting the new chain id will trigger the web3 provider to be recreated (via the useMemo)
     setWeb3ChainId(newChainId);
-    await loadWeb3Accounts();
-  }, [web3, web3ChainId, loadWeb3Accounts]);
+  }, [web3, web3ChainId]);
 
   const monitorWeb3AccountChanges = React.useCallback(async (): Promise<void> => {
     if (!eip1193Provider) {
