@@ -36,17 +36,21 @@ type Web3AccountControl = {
 
 export const Web3AccountContext = React.createContext<Web3AccountControl | undefined | null>(undefined);
 
+export interface IReownConfig {
+  projectId: string;
+  name: string;
+  description: string;
+  url: string;
+  icons: string[];
+}
+
 interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
   localStorageClient: LocalStorageClient;
   onError: (error: Error) => void;
-  reownConfig?: {
-    projectId: string;
-    name: string;
-    description: string;
-    url: string;
-    icons: string[];
-  };
+  reownConfig?: IReownConfig;
 }
+
+let isReownInitializedGlobally = false;
 
 export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
   const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
@@ -55,13 +59,12 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const [loginCount, setLoginCount] = React.useState<number>(0);
   const [providers, setProviders] = React.useState<Eip6963ProviderDetail[] | undefined>(undefined);
   const [isWaitingToLinkAccount, setIsWaitingToLinkAccount] = React.useState<boolean>(false);
-  const [isReownInitialized, setIsReownInitialized] = React.useState<boolean>(false);
   const providersRef = React.useRef<Eip6963ProviderDetail[] | undefined>(undefined);
   providersRef.current = providers;
   const onError = props.onError;
 
   React.useEffect((): void => {
-    if (props.reownConfig && !isReownInitialized) {
+    if (props.reownConfig && !isReownInitializedGlobally) {
       createAppKit({
         adapters: [new ReownEthersAdapter()],
         networks: [mainnet, base],
@@ -76,9 +79,9 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           analytics: true,
         },
       });
-      setIsReownInitialized(true);
+      isReownInitializedGlobally = true;
     }
-  }, [props.reownConfig, isReownInitialized]);
+  }, [props.reownConfig]);
 
   const chooseEip1193Provider = React.useCallback((eip1193ProviderRdns: string): void => {
     if (eip1193Provider != null) {
@@ -529,6 +532,10 @@ export const useReownConnection = (): ReownConnection => {
 export const useWeb3OnReownLoginClicked = (): (() => Promise<void>) => {
   const { openModal } = useReownConnection();
   return openModal;
+};
+
+export const useIsReownInitialized = (): boolean => {
+  return isReownInitializedGlobally;
 };
 
 export const useWeb3LoginSignature = (): Web3LoginSignature | undefined | null => {
