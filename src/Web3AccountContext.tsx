@@ -3,16 +3,13 @@ import React from 'react';
 import { createBaseAccountSDK } from '@base-org/account';
 import { dateToString, generateRandomString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useEventListener, useInitialization } from '@kibalabs/core-react';
+import { createAppKit } from '@reown/appkit';
+import { base, mainnet } from '@reown/appkit/networks';
+import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
+import { EthersAdapter as ReownEthersAdapter } from '@reown/appkit-adapter-ethers';
 import { BrowserProvider, Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
 
 import { Eip6963AnnounceProviderEvent, Eip6963ProviderDetail, Web3Provider, Web3Signer } from './model';
-
-// Extend the Window interface to include the ethereum property
-declare global {
-  interface Window {
-    ethereum?: Eip1193Provider;
-  }
-}
 
 export type Web3Account = {
   address: string;
@@ -42,6 +39,13 @@ export const Web3AccountContext = React.createContext<Web3AccountControl | undef
 interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
   localStorageClient: LocalStorageClient;
   onError: (error: Error) => void;
+  reownConfig?: {
+    projectId: string;
+    name: string;
+    description: string;
+    url: string;
+    icons: string[];
+  };
 }
 
 export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
@@ -51,9 +55,30 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const [loginCount, setLoginCount] = React.useState<number>(0);
   const [providers, setProviders] = React.useState<Eip6963ProviderDetail[] | undefined>(undefined);
   const [isWaitingToLinkAccount, setIsWaitingToLinkAccount] = React.useState<boolean>(false);
+  const [isReownInitialized, setIsReownInitialized] = React.useState<boolean>(false);
   const providersRef = React.useRef<Eip6963ProviderDetail[] | undefined>(undefined);
   providersRef.current = providers;
   const onError = props.onError;
+
+  React.useEffect((): void => {
+    if (props.reownConfig && !isReownInitialized) {
+      createAppKit({
+        adapters: [new ReownEthersAdapter()],
+        networks: [mainnet, base],
+        projectId: props.reownConfig.projectId,
+        metadata: {
+          name: props.reownConfig.name,
+          description: props.reownConfig.description,
+          url: props.reownConfig.url,
+          icons: props.reownConfig.icons,
+        },
+        features: {
+          analytics: true,
+        },
+      });
+      setIsReownInitialized(true);
+    }
+  }, [props.reownConfig, isReownInitialized]);
 
   const chooseEip1193Provider = React.useCallback((eip1193ProviderRdns: string): void => {
     if (eip1193Provider != null) {
@@ -97,7 +122,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const loadWeb3 = async (): Promise<void> => {
     window.dispatchEvent(new Event('eip6963:requestProvider'));
     // NOTE(krishan711): need to keep window.ethereum as a fallback option for injected wallet
-    if (window.ethereum != null) {
+    const windowEthereum = window.ethereum as Eip1193Provider | undefined;
+    if (windowEthereum != null && 'request' in windowEthereum) {
       const newProvider: Eip6963ProviderDetail = {
         info: {
           uuid: 'ethers',
@@ -105,7 +131,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           icon: "data:image/svg+xml,%3Csvg width='500' height='500' viewBox='0 0 500 500' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_13_2)'%3E%3Crect width='500' height='500' rx='250' fill='white'/%3E%3Cpath d='M356.875 175.188H143.125C125.417 175.188 111.062 189.542 111.062 207.25V335.5C111.062 353.208 125.417 367.562 143.125 367.562H356.875C374.583 367.562 388.938 353.208 388.938 335.5V207.25C388.938 189.542 374.583 175.188 356.875 175.188Z' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M353.776 175.187V155.148C353.774 150.234 352.688 145.38 350.594 140.933C348.501 136.486 345.452 132.556 341.664 129.424C337.877 126.291 333.445 124.033 328.685 122.81C323.925 121.588 318.953 121.431 314.125 122.351L138.209 152.376C130.569 153.832 123.677 157.908 118.722 163.902C113.766 169.895 111.057 177.43 111.063 185.207V217.937' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M324.813 292.75C320.585 292.75 316.452 291.496 312.937 289.148C309.422 286.799 306.682 283.461 305.065 279.555C303.447 275.649 303.023 271.351 303.848 267.205C304.673 263.059 306.709 259.25 309.698 256.261C312.687 253.271 316.496 251.235 320.642 250.411C324.789 249.586 329.087 250.009 332.992 251.627C336.898 253.245 340.236 255.985 342.585 259.5C344.934 263.015 346.188 267.147 346.188 271.375C346.188 277.044 343.936 282.481 339.927 286.489C335.918 290.498 330.482 292.75 324.813 292.75Z' fill='black'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_13_2'%3E%3Crect width='500' height='500' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A",
           rdns: 'ethers',
         },
-        provider: window.ethereum,
+        provider: windowEthereum,
       };
       setProviders((prevProviders: Eip6963ProviderDetail[] | undefined): Eip6963ProviderDetail[] => {
         const previousProviders = prevProviders ?? [];
@@ -474,6 +500,35 @@ export const useWeb3OnBaseLoginClicked = (): ((chainId: number, statement: strin
     throw Error('web3AccountsControl has not been initialized correctly.');
   }
   return web3AccountsControl.onWeb3BaseLoginClicked;
+};
+
+export type ReownConnection = {
+  openModal: () => Promise<void>;
+  isConnected: boolean;
+  address: string | undefined;
+  walletProvider: unknown;
+};
+
+export const useReownConnection = (): ReownConnection => {
+  const { open } = useAppKit();
+  const { walletProvider } = useAppKitProvider('eip155');
+  const { isConnected, address } = useAppKitAccount();
+
+  const openModal = React.useCallback(async (): Promise<void> => {
+    await open();
+  }, [open]);
+
+  return {
+    openModal,
+    isConnected,
+    address,
+    walletProvider,
+  };
+};
+
+export const useWeb3OnReownLoginClicked = (): (() => Promise<void>) => {
+  const { openModal } = useReownConnection();
+  return openModal;
 };
 
 export const useWeb3LoginSignature = (): Web3LoginSignature | undefined | null => {

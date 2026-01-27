@@ -19,14 +19,16 @@
     "@base-org/account": "^2.5.1",
     "@kibalabs/core": "^0.6.3-next.6",
     "@kibalabs/core-react": "^0.9.7-next.3",
+    "@reown/appkit": "^1.8.17",
+    "@reown/appkit-adapter-ethers": "^1.8.17",
     "ethers": "^6.16.0"
   },
   "devDependencies": {
     "@kibalabs/build": "0.13.3-next.12",
     "@types/react": "19.2.9",
     "@types/react-dom": "19.2.3",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "peerDependencies": {
     "react": "^17.0.0 || ^18.0.0 || ^19.0.0",
