@@ -4,7 +4,7 @@ import { createBaseAccountSDK } from '@base-org/account';
 import { dateToString, generateRandomString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useEventListener, useInitialization } from '@kibalabs/core-react';
 import { base, mainnet } from '@reown/appkit/networks';
-import { createAppKit, useAppKit } from '@reown/appkit/react';
+import { createAppKit, useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { EthersAdapter as ReownEthersAdapter } from '@reown/appkit-adapter-ethers';
 import { BrowserProvider, Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
 
@@ -59,7 +59,6 @@ export const web3Initialize = (config: IWeb3Config): void => {
     return;
   }
   if (config.reownConfig && !isReownInitializedGlobally) {
-    console.log('createAppKit', config.reownConfig);
     createAppKit({
       adapters: [new ReownEthersAdapter()],
       networks: [mainnet, base],
@@ -77,6 +76,36 @@ export const web3Initialize = (config: IWeb3Config): void => {
     isReownInitializedGlobally = true;
   }
 };
+
+interface IAppKitSyncProps {
+  localStorageClient: LocalStorageClient;
+  setEip1193Provider: (provider: Eip1193Provider | null) => void;
+  setWeb3Account: (account: Web3Account | null) => void;
+  setWeb3ChainId: (chainId: number) => void;
+}
+
+function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
+  const appKitAccount = useAppKitAccount();
+  const appKitProviderResult = useAppKitProvider('eip155');
+  React.useEffect((): void => {
+    if (!appKitAccount?.isConnected || !appKitAccount?.address || !appKitProviderResult?.walletProvider) {
+      return;
+    }
+    const walletProvider = appKitProviderResult.walletProvider as Eip1193Provider;
+    props.setEip1193Provider(walletProvider);
+    props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', 'reown');
+    const syncAccount = async (): Promise<void> => {
+      const browserProvider = new EthersBrowserProvider(walletProvider);
+      const signer = await browserProvider.getSigner();
+      const address = await signer.getAddress();
+      props.setWeb3Account({ address, signer });
+      const chainIdHex = await browserProvider.send('eth_chainId', []);
+      props.setWeb3ChainId(Number(chainIdHex));
+    };
+    syncAccount();
+  }, [appKitAccount?.isConnected, appKitAccount?.address, appKitProviderResult?.walletProvider, props]);
+  return null;
+}
 
 export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
   const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
@@ -466,6 +495,14 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
+      {isReownInitializedGlobally && (
+        <AppKitSync
+          localStorageClient={props.localStorageClient}
+          setEip1193Provider={setEip1193Provider}
+          setWeb3Account={setWeb3Account}
+          setWeb3ChainId={setWeb3ChainId}
+        />
+      )}
       {props.children}
     </Web3AccountContext.Provider>
   );
