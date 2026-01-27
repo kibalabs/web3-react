@@ -3,14 +3,16 @@ import React from 'react';
 import { createBaseAccountSDK } from '@base-org/account';
 import { dateToString, generateRandomString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useEventListener, useInitialization } from '@kibalabs/core-react';
+import { base, mainnet } from '@reown/appkit/networks';
+import { createAppKit, useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
+import { EthersAdapter as ReownEthersAdapter } from '@reown/appkit-adapter-ethers';
 import { BrowserProvider, Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
 
 import { Eip6963AnnounceProviderEvent, Eip6963ProviderDetail, Web3Provider, Web3Signer } from './model';
 
-// Extend the Window interface to include the ethereum property
 declare global {
   interface Window {
-    ethereum?: Eip1193Provider;
+    ethereum?: Record<string, unknown> | undefined;
   }
 }
 
@@ -39,9 +41,76 @@ type Web3AccountControl = {
 
 export const Web3AccountContext = React.createContext<Web3AccountControl | undefined | null>(undefined);
 
+export interface IReownConfig {
+  projectId: string;
+  name: string;
+  description: string;
+  url: string;
+  icons: string[];
+}
+
+export interface IWeb3Config {
+  reownConfig?: IReownConfig;
+}
+
 interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
   localStorageClient: LocalStorageClient;
   onError: (error: Error) => void;
+}
+
+let isReownInitializedGlobally = false;
+
+export const web3Initialize = (config: IWeb3Config): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (config.reownConfig && !isReownInitializedGlobally) {
+    createAppKit({
+      adapters: [new ReownEthersAdapter()],
+      networks: [mainnet, base],
+      projectId: config.reownConfig.projectId,
+      metadata: {
+        name: config.reownConfig.name,
+        description: config.reownConfig.description,
+        url: config.reownConfig.url,
+        icons: config.reownConfig.icons,
+      },
+      features: {
+        analytics: true,
+      },
+    });
+    isReownInitializedGlobally = true;
+  }
+};
+
+interface IAppKitSyncProps {
+  localStorageClient: LocalStorageClient;
+  setEip1193Provider: (provider: Eip1193Provider | null) => void;
+  setWeb3Account: (account: Web3Account | null) => void;
+  setWeb3ChainId: (chainId: number) => void;
+}
+
+function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
+  const appKitAccount = useAppKitAccount();
+  const appKitProviderResult = useAppKitProvider('eip155');
+  React.useEffect((): void => {
+    if (!appKitAccount?.isConnected || !appKitAccount?.address || !appKitProviderResult?.walletProvider) {
+      return;
+    }
+    const walletProvider = appKitProviderResult.walletProvider as Eip1193Provider;
+    props.setEip1193Provider(walletProvider);
+    props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', 'reown');
+    const syncAccount = async (): Promise<void> => {
+      const browserProvider = new EthersBrowserProvider(walletProvider);
+      const signer = await browserProvider.getSigner();
+      const address = await signer.getAddress();
+      props.setWeb3Account({ address, signer });
+      const chainIdHex = await browserProvider.send('eth_chainId', []);
+      props.setWeb3ChainId(Number(chainIdHex));
+    };
+    syncAccount();
+  }, [appKitAccount?.isConnected, appKitAccount?.address, appKitProviderResult?.walletProvider, props]);
+  return null;
 }
 
 export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
@@ -105,7 +174,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           icon: "data:image/svg+xml,%3Csvg width='500' height='500' viewBox='0 0 500 500' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cg clip-path='url(%23clip0_13_2)'%3E%3Crect width='500' height='500' rx='250' fill='white'/%3E%3Cpath d='M356.875 175.188H143.125C125.417 175.188 111.062 189.542 111.062 207.25V335.5C111.062 353.208 125.417 367.562 143.125 367.562H356.875C374.583 367.562 388.938 353.208 388.938 335.5V207.25C388.938 189.542 374.583 175.188 356.875 175.188Z' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M353.776 175.187V155.148C353.774 150.234 352.688 145.38 350.594 140.933C348.501 136.486 345.452 132.556 341.664 129.424C337.877 126.291 333.445 124.033 328.685 122.81C323.925 121.588 318.953 121.431 314.125 122.351L138.209 152.376C130.569 153.832 123.677 157.908 118.722 163.902C113.766 169.895 111.057 177.43 111.063 185.207V217.937' stroke='black' stroke-width='32' stroke-linejoin='round'/%3E%3Cpath d='M324.813 292.75C320.585 292.75 316.452 291.496 312.937 289.148C309.422 286.799 306.682 283.461 305.065 279.555C303.447 275.649 303.023 271.351 303.848 267.205C304.673 263.059 306.709 259.25 309.698 256.261C312.687 253.271 316.496 251.235 320.642 250.411C324.789 249.586 329.087 250.009 332.992 251.627C336.898 253.245 340.236 255.985 342.585 259.5C344.934 263.015 346.188 267.147 346.188 271.375C346.188 277.044 343.936 282.481 339.927 286.489C335.918 290.498 330.482 292.75 324.813 292.75Z' fill='black'/%3E%3C/g%3E%3Cdefs%3E%3CclipPath id='clip0_13_2'%3E%3Crect width='500' height='500' fill='white'/%3E%3C/clipPath%3E%3C/defs%3E%3C/svg%3E%0A",
           rdns: 'ethers',
         },
-        provider: window.ethereum,
+        // @ts-ignore
+        provider: (window.ethereum as Eip1193Provider),
       };
       setProviders((prevProviders: Eip6963ProviderDetail[] | undefined): Eip6963ProviderDetail[] => {
         const previousProviders = prevProviders ?? [];
@@ -431,6 +501,14 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
+      {isReownInitializedGlobally && (
+        <AppKitSync
+          localStorageClient={props.localStorageClient}
+          setEip1193Provider={setEip1193Provider}
+          setWeb3Account={setWeb3Account}
+          setWeb3ChainId={setWeb3ChainId}
+        />
+      )}
       {props.children}
     </Web3AccountContext.Provider>
   );
@@ -474,6 +552,18 @@ export const useWeb3OnBaseLoginClicked = (): ((chainId: number, statement: strin
     throw Error('web3AccountsControl has not been initialized correctly.');
   }
   return web3AccountsControl.onWeb3BaseLoginClicked;
+};
+
+export const useWeb3OnReownLoginClicked = (): (() => Promise<void>) => {
+  const { open } = useAppKit();
+  const openModal = React.useCallback(async (): Promise<void> => {
+    await open();
+  }, [open]);
+  return openModal;
+};
+
+export const useIsReownInitialized = (): boolean => {
+  return isReownInitializedGlobally;
 };
 
 export const useWeb3LoginSignature = (): Web3LoginSignature | undefined | null => {
