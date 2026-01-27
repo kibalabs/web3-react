@@ -11,4 +11,4 @@ RUN make install
 
 # Build app
 COPY . .
-# RUN make build
+RUN make build
