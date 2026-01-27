@@ -10,6 +10,13 @@ import { BrowserProvider, Eip1193Provider, BrowserProvider as EthersBrowserProvi
 
 import { Eip6963AnnounceProviderEvent, Eip6963ProviderDetail, Web3Provider, Web3Signer } from './model';
 
+// Extend the Window interface to include the ethereum property
+declare global {
+  interface Window {
+    ethereum?: Eip1193Provider;
+  }
+}
+
 export type Web3Account = {
   address: string;
   signer: Web3Signer;
