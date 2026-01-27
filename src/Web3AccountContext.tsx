@@ -3,9 +3,8 @@ import React from 'react';
 import { createBaseAccountSDK } from '@base-org/account';
 import { dateToString, generateRandomString, LocalStorageClient } from '@kibalabs/core';
 import { IMultiAnyChildProps, useEventListener, useInitialization } from '@kibalabs/core-react';
-import { createAppKit } from '@reown/appkit';
 import { base, mainnet } from '@reown/appkit/networks';
-import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
+import { createAppKit, useAppKit } from '@reown/appkit/react';
 import { EthersAdapter as ReownEthersAdapter } from '@reown/appkit-adapter-ethers';
 import { BrowserProvider, Eip1193Provider, BrowserProvider as EthersBrowserProvider } from 'ethers';
 
@@ -44,13 +43,40 @@ export interface IReownConfig {
   icons: string[];
 }
 
-interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
-  localStorageClient: LocalStorageClient;
-  onError: (error: Error) => void;
+export interface IWeb3Config {
   reownConfig?: IReownConfig;
 }
 
+interface IWeb3AccountControlProviderProps extends IMultiAnyChildProps {
+  localStorageClient: LocalStorageClient;
+  onError: (error: Error) => void;
+}
+
 let isReownInitializedGlobally = false;
+
+export const web3Initialize = (config: IWeb3Config): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (config.reownConfig && !isReownInitializedGlobally) {
+    console.log('createAppKit', config.reownConfig);
+    createAppKit({
+      adapters: [new ReownEthersAdapter()],
+      networks: [mainnet, base],
+      projectId: config.reownConfig.projectId,
+      metadata: {
+        name: config.reownConfig.name,
+        description: config.reownConfig.description,
+        url: config.reownConfig.url,
+        icons: config.reownConfig.icons,
+      },
+      features: {
+        analytics: true,
+      },
+    });
+    isReownInitializedGlobally = true;
+  }
+};
 
 export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
   const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
@@ -62,26 +88,6 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const providersRef = React.useRef<Eip6963ProviderDetail[] | undefined>(undefined);
   providersRef.current = providers;
   const onError = props.onError;
-
-  React.useEffect((): void => {
-    if (props.reownConfig && !isReownInitializedGlobally) {
-      createAppKit({
-        adapters: [new ReownEthersAdapter()],
-        networks: [mainnet, base],
-        projectId: props.reownConfig.projectId,
-        metadata: {
-          name: props.reownConfig.name,
-          description: props.reownConfig.description,
-          url: props.reownConfig.url,
-          icons: props.reownConfig.icons,
-        },
-        features: {
-          analytics: true,
-        },
-      });
-      isReownInitializedGlobally = true;
-    }
-  }, [props.reownConfig]);
 
   const chooseEip1193Provider = React.useCallback((eip1193ProviderRdns: string): void => {
     if (eip1193Provider != null) {
@@ -505,32 +511,11 @@ export const useWeb3OnBaseLoginClicked = (): ((chainId: number, statement: strin
   return web3AccountsControl.onWeb3BaseLoginClicked;
 };
 
-export type ReownConnection = {
-  openModal: () => Promise<void>;
-  isConnected: boolean;
-  address: string | undefined;
-  walletProvider: unknown;
-};
-
-export const useReownConnection = (): ReownConnection => {
+export const useWeb3OnReownLoginClicked = (): (() => Promise<void>) => {
   const { open } = useAppKit();
-  const { walletProvider } = useAppKitProvider('eip155');
-  const { isConnected, address } = useAppKitAccount();
-
   const openModal = React.useCallback(async (): Promise<void> => {
     await open();
   }, [open]);
-
-  return {
-    openModal,
-    isConnected,
-    address,
-    walletProvider,
-  };
-};
-
-export const useWeb3OnReownLoginClicked = (): (() => Promise<void>) => {
-  const { openModal } = useReownConnection();
   return openModal;
 };
 
