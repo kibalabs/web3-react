@@ -10,6 +10,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Added
 
 ### Changed
+
+### Removed
+
+## [0.3.0] - 2025-01-029
+
+### Added
+
+- [MINOR] Add base account login functions
+- [MINOR] Add reown (walletkit) login functions
+
+### Changed
 - [MAJOR] Updated to ethers v6
 - [MINOR] Added model to abstract away ethers types
 - [MAJOR] Updated package to es-module
@@ -20,8 +31,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - [MAJOR] Updated default message to be SIWE compliant
 - [MINOR] Implemented login with base via `useWeb3OnBaseLoginClicked`
 - [MAJOR] Don't force refresh when the chainId changes
-
-### Removed
 
 ## [0.2.0] - 2023-01-26
 
