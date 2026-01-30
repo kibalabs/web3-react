@@ -31,6 +31,7 @@ type Web3AccountControl = {
   web3ChainId: number | undefined | null;
   web3Account: Web3Account | undefined | null;
   web3LoginSignature: Web3LoginSignature | undefined | null;
+  isRestoringSession: boolean;
   providers: Eip6963ProviderDetail[];
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => Promise<boolean>;
@@ -88,11 +89,22 @@ interface IAppKitSyncProps {
   setEip1193Provider: (provider: Eip1193Provider | null) => void;
   setWeb3Account: (account: Web3Account | null) => void;
   setWeb3ChainId: (chainId: number) => void;
+  setIsReownSessionRestored: (isRestored: boolean) => void;
 }
 
 function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
   const appKitAccount = useAppKitAccount();
   const appKitProviderResult = useAppKitProvider('eip155');
+
+  // Mark Reown session as restored once AppKit has determined connection status
+  // appKitAccount.isConnected will be false if no session, or true if session restored
+  React.useEffect((): void => {
+    // appKitAccount is undefined while loading, then becomes an object with isConnected
+    if (appKitAccount !== undefined && appKitAccount !== null) {
+      props.setIsReownSessionRestored(true);
+    }
+  }, [appKitAccount, props]);
+
   React.useEffect((): void => {
     if (!appKitAccount?.isConnected || !appKitAccount?.address || !appKitProviderResult?.walletProvider) {
       return;
@@ -120,6 +132,14 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const [loginCount, setLoginCount] = React.useState<number>(0);
   const [providers, setProviders] = React.useState<Eip6963ProviderDetail[] | undefined>(undefined);
   const [isWaitingToLinkAccount, setIsWaitingToLinkAccount] = React.useState<boolean>(false);
+  const [isReownSessionRestored, setIsReownSessionRestored] = React.useState<boolean>(false);
+  // Check if there's a saved provider that might be restoring (used to prevent flash of logged-out state)
+  const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+  // For Reown, we need to wait until AppKitSync has determined if there's a session
+  const isReownRestoring = savedProviderRdns === 'reown' && !isReownSessionRestored && web3Account === undefined;
+  // For other providers, check if we have a saved provider but no account yet
+  const isOtherProviderRestoring = savedProviderRdns != null && savedProviderRdns !== 'reown' && web3Account === undefined;
+  const isRestoringSession = isReownRestoring || isOtherProviderRestoring;
   const providersRef = React.useRef<Eip6963ProviderDetail[] | undefined>(undefined);
   providersRef.current = providers;
   const onError = props.onError;
@@ -496,8 +516,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   }, [web3Account, web3ChainId, props.localStorageClient, loginCount]);
 
   const providerValue = React.useMemo((): Web3AccountControl => {
-    return { web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId };
-  }, [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
+    return { web3Account, web3LoginSignature, isRestoringSession, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId };
+  }, [web3Account, web3LoginSignature, isRestoringSession, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
@@ -507,6 +527,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           setEip1193Provider={setEip1193Provider}
           setWeb3Account={setWeb3Account}
           setWeb3ChainId={setWeb3ChainId}
+          setIsReownSessionRestored={setIsReownSessionRestored}
         />
       )}
       {props.children}
@@ -564,6 +585,14 @@ export const useWeb3OnReownLoginClicked = (): (() => Promise<void>) => {
 
 export const useIsReownInitialized = (): boolean => {
   return isReownInitializedGlobally;
+};
+
+export const useIsRestoringSession = (): boolean => {
+  const web3AccountsControl = React.useContext(Web3AccountContext);
+  if (!web3AccountsControl) {
+    throw Error('web3AccountsControl has not been initialized correctly.');
+  }
+  return web3AccountsControl.isRestoringSession;
 };
 
 export const useWeb3LoginSignature = (): Web3LoginSignature | undefined | null => {
