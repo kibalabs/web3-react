@@ -101,21 +101,18 @@ function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
   // Reown initially reports isConnected=false before it finishes restoring the session
   React.useEffect((): (() => void) => {
     const savedRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
-
     // Only set up the timeout if we're expecting a reown session and haven't already set up the account
     if (savedRdns !== 'reown' || hasSetAccountRef.current) {
-      return () => {};
+      return (): void => {};
     }
-
     // If already connected, no need for timeout
     if (appKitAccount?.isConnected) {
       if (noSessionTimeoutRef.current) {
         clearTimeout(noSessionTimeoutRef.current);
         noSessionTimeoutRef.current = null;
       }
-      return () => {};
+      return (): void => {};
     }
-
     // Set a timeout - if we don't get connected within this time, assume no session
     noSessionTimeoutRef.current = setTimeout(() => {
       // Double-check we still haven't connected
@@ -124,8 +121,7 @@ function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
         props.setWeb3Account(null);
       }
     }, 3000); // 3 second timeout to allow Reown to restore session
-
-    return () => {
+    return (): void => {
       if (noSessionTimeoutRef.current) {
         clearTimeout(noSessionTimeoutRef.current);
         noSessionTimeoutRef.current = null;
@@ -133,30 +129,22 @@ function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
     };
   }, [appKitAccount?.isConnected, props]);
 
-  // When Reown connects, sync the account
   React.useEffect((): void => {
     if (!appKitAccount?.isConnected || !appKitAccount?.address || !appKitProviderResult?.walletProvider) {
       return;
     }
-
-    // Don't sync again if we've already set the account
     if (hasSetAccountRef.current) {
       return;
     }
-
-    // Clear any pending no-session timeout
     if (noSessionTimeoutRef.current) {
       clearTimeout(noSessionTimeoutRef.current);
       noSessionTimeoutRef.current = null;
     }
-
     // Mark as set immediately to prevent duplicate calls
     hasSetAccountRef.current = true;
-
     const walletProvider = appKitProviderResult.walletProvider as Eip1193Provider;
     props.setEip1193Provider(walletProvider);
     props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', 'reown');
-
     const syncAccount = async (): Promise<void> => {
       const browserProvider = new EthersBrowserProvider(walletProvider);
       const signer = await browserProvider.getSigner();
