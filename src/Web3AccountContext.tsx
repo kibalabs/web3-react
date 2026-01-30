@@ -631,7 +631,7 @@ export const useIsReownInitialized = (): boolean => {
   return isReownInitializedGlobally;
 };
 
-export const useIsRestoringSession = (): boolean => {
+export const useIsRestoringWeb3Session = (): boolean => {
   const web3AccountsControl = React.useContext(Web3AccountContext);
   if (!web3AccountsControl) {
     throw Error('web3AccountsControl has not been initialized correctly.');
