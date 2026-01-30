@@ -31,6 +31,7 @@ type Web3AccountControl = {
   web3ChainId: number | undefined | null;
   web3Account: Web3Account | undefined | null;
   web3LoginSignature: Web3LoginSignature | undefined | null;
+  isRestoringSession: boolean;
   providers: Eip6963ProviderDetail[];
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => Promise<boolean>;
@@ -93,10 +94,54 @@ interface IAppKitSyncProps {
 function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
   const appKitAccount = useAppKitAccount();
   const appKitProviderResult = useAppKitProvider('eip155');
+  const hasSetAccountRef = React.useRef(false);
+  const noSessionTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Handle the case when Reown has no session - use a timeout to avoid race conditions
+  // Reown initially reports isConnected=false before it finishes restoring the session
+  React.useEffect((): (() => void) => {
+    const savedRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+    // Only set up the timeout if we're expecting a reown session and haven't already set up the account
+    if (savedRdns !== 'reown' || hasSetAccountRef.current) {
+      return (): void => {};
+    }
+    // If already connected, no need for timeout
+    if (appKitAccount?.isConnected) {
+      if (noSessionTimeoutRef.current) {
+        clearTimeout(noSessionTimeoutRef.current);
+        noSessionTimeoutRef.current = null;
+      }
+      return (): void => {};
+    }
+    // Set a timeout - if we don't get connected within this time, assume no session
+    noSessionTimeoutRef.current = setTimeout(() => {
+      // Double-check we still haven't connected
+      if (!hasSetAccountRef.current) {
+        props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
+        props.setWeb3Account(null);
+      }
+    }, 3000); // 3 second timeout to allow Reown to restore session
+    return (): void => {
+      if (noSessionTimeoutRef.current) {
+        clearTimeout(noSessionTimeoutRef.current);
+        noSessionTimeoutRef.current = null;
+      }
+    };
+  }, [appKitAccount?.isConnected, props]);
+
   React.useEffect((): void => {
     if (!appKitAccount?.isConnected || !appKitAccount?.address || !appKitProviderResult?.walletProvider) {
       return;
     }
+    if (hasSetAccountRef.current) {
+      return;
+    }
+    if (noSessionTimeoutRef.current) {
+      clearTimeout(noSessionTimeoutRef.current);
+      noSessionTimeoutRef.current = null;
+    }
+    // Mark as set immediately to prevent duplicate calls
+    hasSetAccountRef.current = true;
     const walletProvider = appKitProviderResult.walletProvider as Eip1193Provider;
     props.setEip1193Provider(walletProvider);
     props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', 'reown');
@@ -110,6 +155,7 @@ function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
     };
     syncAccount();
   }, [appKitAccount?.isConnected, appKitAccount?.address, appKitProviderResult?.walletProvider, props]);
+
   return null;
 }
 
@@ -120,6 +166,9 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const [loginCount, setLoginCount] = React.useState<number>(0);
   const [providers, setProviders] = React.useState<Eip6963ProviderDetail[] | undefined>(undefined);
   const [isWaitingToLinkAccount, setIsWaitingToLinkAccount] = React.useState<boolean>(false);
+  // Check if there's a saved provider that might be restoring (used to prevent flash of logged-out state)
+  const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+  const isRestoringSession = savedProviderRdns != null && web3Account === undefined;
   const providersRef = React.useRef<Eip6963ProviderDetail[] | undefined>(undefined);
   providersRef.current = providers;
   const onError = props.onError;
@@ -237,8 +286,12 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (eip1193Provider != null || providers === undefined) {
       return;
     }
-    const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
-    if (savedProviderRdns === 'base') {
+    const savedRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+    // Reown/WalletConnect is handled by AppKitSync, not here
+    if (savedRdns === 'reown') {
+      return;
+    }
+    if (savedRdns === 'base') {
       const baseReconnected = await autoReconnectBaseProvider();
       if (!baseReconnected) {
         setWeb3Account(null);
@@ -246,8 +299,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
       }
       return;
     }
-    if (savedProviderRdns && providers.length > 0) {
-      const savedProvider = providers.find((provider: Eip6963ProviderDetail): boolean => provider.info.rdns === savedProviderRdns);
+    if (savedRdns && providers.length > 0) {
+      const savedProvider = providers.find((provider: Eip6963ProviderDetail): boolean => provider.info.rdns === savedRdns);
       if (savedProvider) {
         setEip1193Provider(savedProvider.provider);
       } else {
@@ -277,8 +330,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     if (linkedWeb3Accounts.length === 0) {
       setWeb3Account(null);
       // NOTE(krishan711): Clean up Base connection if it was a Base provider
-      const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
-      if (savedProviderRdns === 'base') {
+      const currentProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
+      if (currentProviderRdns === 'base') {
         props.localStorageClient.removeValue('web3Account-baseConnection');
         props.localStorageClient.removeValue('web3Account-chosenEip1193ProviderRdns');
       }
@@ -496,8 +549,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   }, [web3Account, web3ChainId, props.localStorageClient, loginCount]);
 
   const providerValue = React.useMemo((): Web3AccountControl => {
-    return { web3Account, web3LoginSignature, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId };
-  }, [web3Account, web3LoginSignature, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
+    return { web3Account, web3LoginSignature, isRestoringSession, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId };
+  }, [web3Account, web3LoginSignature, isRestoringSession, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
@@ -564,6 +617,14 @@ export const useWeb3OnReownLoginClicked = (): (() => Promise<void>) => {
 
 export const useIsReownInitialized = (): boolean => {
   return isReownInitializedGlobally;
+};
+
+export const useIsRestoringWeb3Session = (): boolean => {
+  const web3AccountsControl = React.useContext(Web3AccountContext);
+  if (!web3AccountsControl) {
+    throw Error('web3AccountsControl has not been initialized correctly.');
+  }
+  return web3AccountsControl.isRestoringSession;
 };
 
 export const useWeb3LoginSignature = (): Web3LoginSignature | undefined | null => {
