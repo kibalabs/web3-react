@@ -187,7 +187,7 @@ function SafeSync(props: ISafeSyncProps): React.ReactElement | null {
         const safeSDK = new SafeAppsSDK();
         const safeInfo = await Promise.race([
           safeSDK.safe.getInfo(),
-          new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('Safe detection timeout')), 2000)),
+          new Promise<never>((_resolve, reject) => { setTimeout(() => reject(new Error('Safe detection timeout')), 2000); }),
         ]);
         if (!safeInfo?.safeAddress || hasSetAccountRef.current) {
           return;
