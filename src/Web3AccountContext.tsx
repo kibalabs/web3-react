@@ -32,6 +32,7 @@ type Web3AccountControl = {
   web3Account: Web3Account | undefined | null;
   web3LoginSignature: Web3LoginSignature | undefined | null;
   isRestoringSession: boolean;
+  isSafeApp: boolean;
   providers: Eip6963ProviderDetail[];
   chooseEip1193Provider: (eip1193ProviderRdns: string) => void;
   onLinkWeb3AccountsClicked: () => Promise<boolean>;
@@ -159,6 +160,64 @@ function AppKitSync(props: IAppKitSyncProps): React.ReactElement | null {
   return null;
 }
 
+interface ISafeSyncProps {
+  localStorageClient: LocalStorageClient;
+  setEip1193Provider: (provider: Eip1193Provider | null) => void;
+  setWeb3Account: (account: Web3Account | null) => void;
+  setWeb3ChainId: (chainId: number) => void;
+  setIsSafeApp: (isSafeApp: boolean) => void;
+  setLoginCount: React.Dispatch<React.SetStateAction<number>>;
+}
+
+function SafeSync(props: ISafeSyncProps): React.ReactElement | null {
+  const hasSetAccountRef = React.useRef(false);
+
+  React.useEffect((): void => {
+    if (hasSetAccountRef.current) {
+      return;
+    }
+    // Only attempt Safe detection when running inside an iframe
+    if (typeof window === 'undefined' || window.parent === window) {
+      return;
+    }
+    const detectSafe = async (): Promise<void> => {
+      try {
+        const { default: SafeAppsSDK } = await import('@safe-global/safe-apps-sdk');
+        const { SafeAppProvider } = await import('@safe-global/safe-apps-provider');
+        const safeSDK = new SafeAppsSDK();
+        const safeInfo = await Promise.race([
+          safeSDK.safe.getInfo(),
+          new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error('Safe detection timeout')), 2000)),
+        ]);
+        if (!safeInfo?.safeAddress || hasSetAccountRef.current) {
+          return;
+        }
+        hasSetAccountRef.current = true;
+        props.setIsSafeApp(true);
+        const safeProvider = new SafeAppProvider(safeInfo, safeSDK);
+        const eip1193Provider = safeProvider as unknown as Eip1193Provider;
+        props.setEip1193Provider(eip1193Provider);
+        props.localStorageClient.setValue('web3Account-chosenEip1193ProviderRdns', 'safe');
+        const browserProvider = new EthersBrowserProvider(eip1193Provider);
+        const signer = await browserProvider.getSigner();
+        const address = await signer.getAddress();
+        props.setWeb3Account({ address, signer });
+        props.setWeb3ChainId(safeInfo.chainId);
+        // Check if we already have a stored signature for this Safe address
+        const existingSignature = props.localStorageClient.getValue(`web3Account-signature-${address}`);
+        if (existingSignature) {
+          props.setLoginCount((prev) => prev + 1);
+        }
+      } catch {
+        // Not running inside Safe — this is expected for normal browser access
+      }
+    };
+    detectSafe();
+  }, [props]);
+
+  return null;
+}
+
 export function Web3AccountControlProvider(props: IWeb3AccountControlProviderProps): React.ReactElement {
   const [eip1193Provider, setEip1193Provider] = React.useState<Eip1193Provider | null | undefined>(undefined);
   const [web3ChainId, setWeb3ChainId] = React.useState<number | null | undefined>(undefined);
@@ -166,6 +225,7 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   const [loginCount, setLoginCount] = React.useState<number>(0);
   const [providers, setProviders] = React.useState<Eip6963ProviderDetail[] | undefined>(undefined);
   const [isWaitingToLinkAccount, setIsWaitingToLinkAccount] = React.useState<boolean>(false);
+  const [isSafeApp, setIsSafeApp] = React.useState<boolean>(false);
   // Check if there's a saved provider that might be restoring (used to prevent flash of logged-out state)
   const savedProviderRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
   const isRestoringSession = savedProviderRdns != null && web3Account === undefined;
@@ -289,6 +349,10 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
     const savedRdns = props.localStorageClient.getValue('web3Account-chosenEip1193ProviderRdns');
     // Reown/WalletConnect is handled by AppKitSync, not here
     if (savedRdns === 'reown') {
+      return;
+    }
+    // Safe is handled by SafeSync, not here
+    if (savedRdns === 'safe') {
       return;
     }
     if (savedRdns === 'base') {
@@ -549,8 +613,8 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
   }, [web3Account, web3ChainId, props.localStorageClient, loginCount]);
 
   const providerValue = React.useMemo((): Web3AccountControl => {
-    return { web3Account, web3LoginSignature, isRestoringSession, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId };
-  }, [web3Account, web3LoginSignature, isRestoringSession, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
+    return { web3Account, web3LoginSignature, isRestoringSession, isSafeApp, providers: providers ?? [], onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, chooseEip1193Provider, onSwitchToChainIdClicked, web3, web3ChainId };
+  }, [web3Account, web3LoginSignature, isRestoringSession, isSafeApp, providers, chooseEip1193Provider, onLinkWeb3AccountsClicked, onWeb3LoginClicked, onWeb3BaseLoginClicked, onSwitchToChainIdClicked, web3, web3ChainId]);
 
   return (
     <Web3AccountContext.Provider value={providerValue}>
@@ -562,6 +626,14 @@ export function Web3AccountControlProvider(props: IWeb3AccountControlProviderPro
           setWeb3ChainId={setWeb3ChainId}
         />
       )}
+      <SafeSync
+        localStorageClient={props.localStorageClient}
+        setEip1193Provider={setEip1193Provider}
+        setWeb3Account={setWeb3Account}
+        setWeb3ChainId={setWeb3ChainId}
+        setIsSafeApp={setIsSafeApp}
+        setLoginCount={setLoginCount}
+      />
       {props.children}
     </Web3AccountContext.Provider>
   );
@@ -657,4 +729,12 @@ export const useOnSwitchToWeb3ChainIdClicked = (): ((chainId: number) => Promise
     throw Error('web3AccountsControl has not been initialized correctly.');
   }
   return web3AccountsControl.onSwitchToChainIdClicked;
+};
+
+export const useIsSafeApp = (): boolean => {
+  const web3AccountsControl = React.useContext(Web3AccountContext);
+  if (!web3AccountsControl) {
+    throw Error('web3AccountsControl has not been initialized correctly.');
+  }
+  return web3AccountsControl.isSafeApp;
 };
