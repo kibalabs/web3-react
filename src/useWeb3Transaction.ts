@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Interface, isCallException } from 'ethers';
+import { ErrorCode, Interface, isCallException, isError } from 'ethers';
 
 import { Web3ContractInterface, Web3TransactionReceipt, Web3TransactionResponse } from './model';
 
@@ -14,7 +14,27 @@ export interface Web3TransactionDetails {
   receipt: Web3TransactionReceipt | null;
 }
 
+const ETHERS_ERROR_MESSAGES_BY_CODE: Partial<Record<ErrorCode, string>> = {
+  ACTION_REJECTED: 'Transaction cancelled.',
+  INSUFFICIENT_FUNDS: 'Your wallet does not have enough funds to cover this transaction.',
+  NONCE_EXPIRED: 'This transaction has already been submitted. Refresh and try again.',
+  REPLACEMENT_UNDERPRICED: 'Could not replace the pending transaction — try again with a higher fee.',
+  TIMEOUT: 'The request timed out. Please try again.',
+  NETWORK_ERROR: 'A network error occurred. Please try again.',
+  SERVER_ERROR: 'A network error occurred. Please try again.',
+};
+
 const decodeErrorMessage = (newError: unknown, abi?: Web3ContractInterface): string => {
+  if (isError(newError, 'TRANSACTION_REPLACED')) {
+    if (newError.reason === 'repriced') {
+      return 'Your transaction was sped up by your wallet — check your wallet for the latest status.';
+    }
+    return newError.reason === 'cancelled' ? 'Transaction cancelled.' : 'Your transaction was replaced by another transaction.';
+  }
+  const code = (newError as { code?: ErrorCode } | null)?.code;
+  if (code && ETHERS_ERROR_MESSAGES_BY_CODE[code]) {
+    return ETHERS_ERROR_MESSAGES_BY_CODE[code];
+  }
   if (abi && isCallException(newError) && newError.data) {
     try {
       const parsedError = new Interface(abi).parseError(newError.data);
@@ -22,7 +42,7 @@ const decodeErrorMessage = (newError: unknown, abi?: Web3ContractInterface): str
         return parsedError.name;
       }
     } catch {
-      // Revert data present but not decodable with this ABI (e.g. selector from a different contract)
+      // Revert data present but not decodable with this ABI
     }
   }
   return newError instanceof Error ? newError.message : String(newError);
