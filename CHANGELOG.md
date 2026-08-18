@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
+- [MINOR] Added `useWeb3WritableContract` to get a signer-bound (write-capable) contract instance directly, without a separate `useWeb3Contract` call or a manual `.connect()`
+- [MINOR] Added optional `abi` param to `useWeb3Transaction` and a new `errorMessage` field on `Web3TransactionDetails`, decoding a transaction's custom-error revert data via the ABI when available
+- [MINOR] Added `web3Units` helpers: `Web3MaxUint256`, `formatWeb3Units` (null-safe `formatUnits`), and `parseWeb3Units` (safe-fallback or throwing `parseUnits`)
+
 ### Changed
 
 ### Removed
