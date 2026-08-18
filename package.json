@@ -16,21 +16,21 @@
     "dist/*"
   ],
   "dependencies": {
-    "@base-org/account": "^2.5.2",
+    "@base-org/account": "^2.5.10",
     "@kibalabs/core": "^0.7.1",
     "@kibalabs/core-react": "^0.10.0",
-    "@reown/appkit": "^1.8.19",
-    "@reown/appkit-adapter-ethers": "^1.8.19",
+    "@reown/appkit": "^1.8.23",
+    "@reown/appkit-adapter-ethers": "^1.8.23",
     "@safe-global/safe-apps-provider": "^0.18.6",
     "@safe-global/safe-apps-sdk": "^9.1.0",
-    "ethers": "^6.16.0"
+    "ethers": "^6.17.0"
   },
   "devDependencies": {
-    "@kibalabs/build": "0.14.1",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "@kibalabs/build": "0.14.2-next.4",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "peerDependencies": {
     "react": "^19.0.0",
